@@ -10,7 +10,7 @@ namespace X2Chem {
     
     for (auto i = 0; i < nb; i++) 
     for (auto j = 0; j < nb; j++) {
-      U[i + j*nb] += 1.0;
+      U[i*nb + j] += 1.0;
     }
   
     return;

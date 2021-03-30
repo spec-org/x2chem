@@ -7,10 +7,10 @@ namespace X2Chem {
 
   // Inputs to x2c_hamiltonian
   struct Integrals {
-    const std::complex<double>* S;                  ///< Overlap
-    const std::complex<double>* T;                  ///< Kinetic
-    const std::complex<double>* V;                  ///< Nuclear potential
-    const std::array<std::complex<double>*,4> pVp;  ///< Spin-orbit
+    const double* S;                  ///< Overlap
+    const double* T;                  ///< Kinetic
+    const double* V;                  ///< Nuclear potential
+    const std::array<double*,4> pVp;  ///< Spin-orbit
   };
 
   // Operators output by x2c_hamiltonian
