@@ -25,8 +25,11 @@ set( CMAKE_CXX_STANDARD 11 )
 
 set( CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" )
 
+# SMP parallelism
+find_package(OpenMP)
+
 # Linear algebra
-include( FindLinAlg )
+include( HandleLinAlg )
 
 
 #------------------------------------------------------------------------------
