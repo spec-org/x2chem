@@ -18,6 +18,17 @@ code bases."
 set( CMAKE_CXX_STANDARD_REQUIRED ON )
 set( CMAKE_CXX_STANDARD 11 )
 
+
+#------------------------------------------------------------------------------
+# External dependencies
+#------------------------------------------------------------------------------
+
+set( CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" )
+
+# Linear algebra
+include( FindLinAlg )
+
+
 #------------------------------------------------------------------------------
 # The actual library
 #------------------------------------------------------------------------------
