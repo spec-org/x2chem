@@ -1,21 +1,25 @@
 cmake_minimum_required(VERSION 3.11)
 
+#------------------------------------------------------------------------------
+# Project declaration / Global settings
+#------------------------------------------------------------------------------
 
-project(x2chem)
+project(
+  X2Chem
+  VERSION 0.1.0
+  LANGUAGES C CXX
+  DESCRIPTION
+  "X2Chem is a lightweight library to provide the functionality required for \
+relativistic electronic structure calculations to existing quantum chemistry \
+code bases."
+)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+# C++11
+set( CMAKE_CXX_STANDARD_REQUIRED ON )
+set( CMAKE_CXX_STANDARD 11 )
 
-set(SOURCE_FILES x2chem.cpp x2chem.hpp)
+#------------------------------------------------------------------------------
+# The actual library
+#------------------------------------------------------------------------------
 
-
-# CMake instructions to make the static lib
-add_library(x2chem STATIC ${SOURCE_FILES})
-
-
-
-# CMake instructions to test using the static lib
-#set( APP_EXE StaticTest )
-
-#add_executable( ${APP_EXE} main.cxx ) 
-
-#target_link_libraries( ${APP_EXE} x2chem )
+add_subdirectory(src)
