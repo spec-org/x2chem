@@ -14,8 +14,8 @@ add_library(x2chem STATIC ${SOURCE_FILES})
 
 
 # CMake instructions to test using the static lib
-set( APP_EXE StaticTest )
+#set( APP_EXE StaticTest )
 
-add_executable( ${APP_EXE} main.cxx ) 
+#add_executable( ${APP_EXE} main.cxx ) 
 
-target_link_libraries( ${APP_EXE} x2chem )
+#target_link_libraries( ${APP_EXE} x2chem )
