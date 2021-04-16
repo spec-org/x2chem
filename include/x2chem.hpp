@@ -9,11 +9,12 @@ namespace X2Chem {
   constexpr double LIGHTSPEED = 137.035999074; // Atomic units
 
   // Inputs to x2c_hamiltonian
+  // FIXME: Change to const
   struct Integrals {
-    const double* S;                  ///< Overlap
-    const double* T;                  ///< Kinetic
-    const double* V;                  ///< Nuclear potential
-    const std::array<double*,4> pVp;  ///< Spin-orbit
+    double* S;                  ///< Overlap
+    double* T;                  ///< Kinetic
+    double* V;                  ///< Nuclear potential
+    std::array<double*,4> pVp;  ///< Spin-orbit
   };
 
   // Operators output by x2c_hamiltonian
@@ -29,11 +30,14 @@ namespace X2Chem {
   void boettger_2e_soc(double*, double*);
 
   // Construct 4C Core Hamiltonian
-  void _build_4c_core_ham(const unsigned int, const Integrals&, std::complex<double>*);
+  void _build_4c_core_ham(const unsigned int, double*, double*, 
+                          std::complex<double>*, std::complex<double>*);
 
 
   // Auxilary functions
-  void _real_submat_to_complex(unsigned int, unsigned int, const double*, unsigned int, 
+  void _set_submat_complex(unsigned int, unsigned int, const double*, unsigned int, 
+    std::complex<double>*, unsigned int); 
+  void _set_submat_complex(unsigned int, unsigned int, const std::complex<double>*, unsigned int, 
     std::complex<double>*, unsigned int); 
 
 }

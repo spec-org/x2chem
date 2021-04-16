@@ -10,7 +10,7 @@ namespace X2Chem {
   // real(A) -> complex(B) = [. A .]
   //                         [. . .]
   //
-  void _real_submat_to_complex(unsigned int n, unsigned int m, const double* A, unsigned int LDA, 
+  void _set_submat_complex(unsigned int n, unsigned int m, const double* A, unsigned int LDA, 
     std::complex<double>* B, unsigned int LDB) 
   {
     for (auto i = 0; i < m; i++)
@@ -19,15 +19,58 @@ namespace X2Chem {
     }
   }
 
-  void _build_4c_core_ham(const unsigned int nb, const Integrals& ints, std::complex<double>* core4c)
+  // Complex matrix A is written to arbitrary subblock of B
+  //
+  //                            [. . .]  
+  // complex(A) -> complex(B) = [. A .]
+  //                            [. . .]
+  //
+  void _set_submat_complex(unsigned int n, unsigned int m, const std::complex<double>* A, unsigned int LDA, 
+    std::complex<double>* B, unsigned int LDB) 
   {
-  
-    // Set spatial ints to subblocks of 4C
-    _real_submat_to_complex(nb, nb, ints.S, nb, core4c, 4*nb);
+    for (auto i = 0; i < m; i++)
+    for (auto j = 0; j < n; j++) {
+        B[i*LDB + j] = A[i*LDA + j];
+    }
+  }
 
-    for (auto i = 0; i < 4*nb; i++) 
-    for (auto j = 0; j < 4*nb; j++) {
-      std::cout << "4C[" << i << "," << j << "]: " << core4c[i*4*nb + j] << std::endl;
+  void _build_4c_core_ham(const unsigned int nb, double* V, double* p, 
+                          std::complex<double>* W, std::complex<double>* core4c)
+  {
+    // Zero out 4C Core Ham memory
+    std::fill_n(core4c,16*nb*nb,std::complex<double>(0.));
+
+
+    // Set proper matrices to subblocks of 4C Hamiltonian
+    
+    // Transformed potential V
+    _set_submat_complex(nb, nb, V, nb, core4c, 4*nb);
+    _set_submat_complex(nb, nb, V, nb, core4c + nb + (4*nb * nb) , 4*nb);
+    
+    // Off-diagonal c*p terms
+    // FIXME pick better variable names
+    std::complex<double>* CP11 = core4c + 8*nb*nb;
+    std::complex<double>* CP12 = CP11   + 4*nb*nb + nb;
+    std::complex<double>* CP21 = core4c + 2*nb;
+    std::complex<double>* CP22 = CP21   + 4*nb*nb + nb;
+
+    for (auto i = 0; i < nb; i++) {
+      CP11[i + 4*nb*i] = LIGHTSPEED + p[i];
+      CP12[i + 4*nb*i] = LIGHTSPEED + p[i];
+      CP21[i + 4*nb*i] = LIGHTSPEED + p[i];
+      CP22[i + 4*nb*i] = LIGHTSPEED + p[i];
+    }
+
+    // Spin orbit matrix W
+    _set_submat_complex(2*nb, 2*nb, W, 2*nb, core4c + 2*nb + (4*nb * 2*nb) , 4*nb);
+
+    // Print matrix column major
+    for (auto i = 0; i < 4*nb; i++) {
+      std::cout << "Row " << i << ":  ";
+      for (auto j = 0; j < 4*nb; j++) {
+        std::cout << core4c[j*4*nb + i] << " ";
+      }
+      std::cout << std::endl;
     }
 
     
@@ -42,8 +85,27 @@ namespace X2Chem {
     //const double* S = ints.S;
     std::complex<double>* U = output.U;
     
+    // Orthonormalize Basis for the transformation K
+    // TK = SKt
+    std::complex<double>* W = new std::complex<double>[4*nb*nb];
+    std::fill_n(W,4*nb*nb,std::complex<double>(0.,1.));
+
+    double* VSR = new double[nb*nb];
+    double* VSL = new double[nb*nb];
+    std::complex<double>* eig = new std::complex<double>[nb];
+    double* beta = new double[nb];
+    double* p = new double[nb];
+    std::fill_n(p,nb,0.0);
+
+    //auto res = lapack::ggev(lapack::Job::NoVec, lapack::Job::Vec, nb, V, nb, 
+    //                        V, nb, eig, beta, VSL, nb, VSR, nb);
+
+    // Transform non-rel potential V
+
+    // Form spin-orbit coupling matrix W
+
     // Build 4C Core Hamiltonian
-    _build_4c_core_ham(nb, ints, core4c);
+    _build_4c_core_ham(nb, ints.V, p, W, core4c);
 
   
     return;
