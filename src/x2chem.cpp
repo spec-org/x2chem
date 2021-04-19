@@ -1,5 +1,7 @@
 #include <iostream>
+#include <algorithm>
 #include <lapack.hh>
+#include <blas.hh>
 #include <x2chem.hpp>
 
 namespace X2Chem {
@@ -34,7 +36,35 @@ namespace X2Chem {
     }
   }
 
-  void _build_4c_core_ham(const unsigned int nb, double* V, double* p, 
+
+  void _print_matrix(unsigned int N, const std::complex<double>* matrix)
+  {
+    // Print matrix column major
+    for (auto i = 0; i < N; i++) {
+      std::cout << "Row " << i << ":  ";
+      for (auto j = 0; j < N; j++) {
+        std::cout << matrix[j*N + i] << " ";
+      }
+      std::cout << std::endl;
+    }
+
+  }
+
+  void _print_matrix(unsigned int N, const double* matrix)
+  {
+    // Print matrix column major
+    for (auto i = 0; i < N; i++) {
+      std::cout << "Row " << i << ":  ";
+      for (auto j = 0; j < N; j++) {
+        std::cout << matrix[j*N + i] << " ";
+      }
+      std::cout << std::endl;
+    }
+
+  }
+
+
+  void _build_4c_core_ham(const unsigned int nb, double* V, std::complex<double>* p, 
                           std::complex<double>* W, std::complex<double>* core4c)
   {
     // Zero out 4C Core Ham memory
@@ -43,7 +73,7 @@ namespace X2Chem {
 
     // Set proper matrices to subblocks of 4C Hamiltonian
     
-    // Transformed potential V
+    // Transformed 1C potential V 
     _set_submat_complex(nb, nb, V, nb, core4c, 4*nb);
     _set_submat_complex(nb, nb, V, nb, core4c + nb + (4*nb * nb) , 4*nb);
     
@@ -64,19 +94,64 @@ namespace X2Chem {
     // Spin orbit matrix W
     _set_submat_complex(2*nb, 2*nb, W, 2*nb, core4c + 2*nb + (4*nb * 2*nb) , 4*nb);
 
-    // Print matrix column major
-    for (auto i = 0; i < 4*nb; i++) {
-      std::cout << "Row " << i << ":  ";
-      for (auto j = 0; j < 4*nb; j++) {
-        std::cout << core4c[j*4*nb + i] << " ";
-      }
-      std::cout << std::endl;
-    }
-
-    
+    //_print_matrix(4*nb, core4c); 
 
     return;
   }
+
+    
+  void _form_1e_soc_matrix(const unsigned int nb, std::complex<double>* W, 
+                           std::array<double*,4> pVp, bool soc)
+  {
+    if( soc ) {
+
+      // W = [ W1  W2 ]
+      //     [ W3  W4 ]
+      std::complex<double> *W1 = W;
+      std::complex<double> *W2 = W1 + 2*nb*nb;
+      std::complex<double> *W3 = W1 + nb;
+      std::complex<double> *W4 = W2 + nb;
+
+      for(auto i = 0; i < nb; i++) {
+        for(auto j = 0; j < nb; j++) {
+
+          // W1 = pV.p + i (pVxp)(Z)
+          W1[j + i*2*nb] =  pVp[0][j + i*nb] + std::complex<double>(0.,1.) * pVp[3][j + i*nb];
+
+          // W2 = (pVxp)(Y) + i (pVxp)(X)
+          W2[j + i*2*nb] =  pVp[2][j + i*nb] + std::complex<double>(0.,1.) * pVp[1][j + i*nb];
+
+          // W3 = -(pVxp)(Y) + i (pVxp)(X)
+          W3[j + i*2*nb] = -pVp[2][j + i*nb] + std::complex<double>(0.,1.) * pVp[1][j + i*nb];
+
+          // W4 = pV.p - i (pVxp)(Z)
+          W4[j + i*2*nb] =  pVp[0][j + i*nb] - std::complex<double>(0.,1.) * pVp[3][j + i*nb];
+        }
+      }
+
+    } else {
+      // FIXME: Scalar X2C calcs should be completely real 
+      // W = [ W1  0  ]
+      //     [ 0   W4 ]
+      std::complex<double> *W1 = W;
+      std::complex<double> *W4 = W1 + 2*nb*nb + nb;
+
+      for(auto i = 0; i < nb; i++) {
+        for(auto j = 0; j < nb; j++) {
+
+          // W1 = pV.p 
+          W1[j + i*2*nb] =  pVp[0][j + i*nb];
+
+          // W4 = pV.p
+          W4[j + i*2*nb] =  pVp[0][j + i*nb];
+        }
+      }
+    
+    }
+      
+    return;
+  } 
+
 
   void x2c_hamiltonian(const unsigned int nb, const Integrals& ints,
     X2COperators& output, std::complex<double>* core4c)
@@ -85,27 +160,68 @@ namespace X2Chem {
     //const double* S = ints.S;
     std::complex<double>* U = output.U;
     
-    // Orthonormalize Basis for the transformation K
-    // TK = SKt
     std::complex<double>* W = new std::complex<double>[4*nb*nb];
     std::fill_n(W,4*nb*nb,std::complex<double>(0.,1.));
 
-    double* VSR = new double[nb*nb];
-    double* VSL = new double[nb*nb];
+    double* K = new double[nb*nb];
+    double* SCR1 = new double[nb*nb];
+    double* SCR2 = new double[nb*nb];
     std::complex<double>* eig = new std::complex<double>[nb];
     double* beta = new double[nb];
-    double* p = new double[nb];
-    std::fill_n(p,nb,0.0);
+    std::complex<double>* p = new std::complex<double>[nb];
+    double* S = ints.S;
+    double* T = ints.T;
+    double* V = ints.V;
+    double* T_copy = new double[nb*nb]; 
+    double* S_copy = new double[nb*nb]; 
+    double* V_tilde = new double[nb*nb]; 
+    std::copy_n(S, nb*nb, S_copy);
+    std::copy_n(T, nb*nb, T_copy);
+    //std::fill_n(p,nb,0.0);
 
-    //auto res = lapack::ggev(lapack::Job::NoVec, lapack::Job::Vec, nb, V, nb, 
-    //                        V, nb, eig, beta, VSL, nb, VSR, nb);
+    std::cout << "Overlap" << "\n";
+    _print_matrix(nb, S); 
+    std::cout << "Kinetic" << "\n";
+    _print_matrix(nb, T);
+
+    // General eigen TK = SKt
+    // to solve for transformation matrix K
+    // T = 1C kinetic; S = 1C overlap
+    // FIXME: orthonormalize T and S first 
+    auto res = lapack::ggev(lapack::Job::NoVec, lapack::Job::Vec, nb, T_copy, nb, 
+                            S_copy, nb, eig, beta, SCR1, nb, K, nb);
+
+    // p = sqrt(2 * t)
+    for (auto i = 0; i < nb; i++) p[i] = std::sqrt( 2 * eig[i] / beta[i] );
+
+
+    // K^+ S K transform
+    blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, K, nb, S, nb, 0.0, SCR1, nb);
+
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, SCR1, nb, K, nb, 0.0, SCR2, nb);
+
+    // Scale K by 1 / sqrt(diag( K^+ S K ))
+    for (auto i = 0; i < nb; i++) 
+    for (auto j = 0; j < nb; j++) 
+      K[j + nb*i] /= std::sqrt(SCR2[i + i*nb]);
 
     // Transform non-rel potential V
+    // K^+ V K
+    blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, K, nb, V, nb, 0.0, SCR1, nb);
+
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, SCR1, nb, K, nb, 0.0, V_tilde, nb);
+
 
     // Form spin-orbit coupling matrix W
+    // and transform
+    _form_1e_soc_matrix(nb, W, ints.pVp, true);
 
     // Build 4C Core Hamiltonian
-    _build_4c_core_ham(nb, ints.V, p, W, core4c);
+    _build_4c_core_ham(nb, V_tilde, p, W, core4c);
 
   
     return;

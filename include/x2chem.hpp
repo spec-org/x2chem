@@ -30,14 +30,22 @@ namespace X2Chem {
   void boettger_2e_soc(double*, double*);
 
   // Construct 4C Core Hamiltonian
-  void _build_4c_core_ham(const unsigned int, double*, double*, 
+  void _build_4c_core_ham(const unsigned int, double*, std::complex<double>*, 
                           std::complex<double>*, std::complex<double>*);
+
+  // Form spin-orbit coupling matrix (W) 
+  void _form_1e_soc_matrix(const unsigned int, std::complex<double>*, std::array<double*,4>, bool);
 
 
   // Auxilary functions
   void _set_submat_complex(unsigned int, unsigned int, const double*, unsigned int, 
     std::complex<double>*, unsigned int); 
   void _set_submat_complex(unsigned int, unsigned int, const std::complex<double>*, unsigned int, 
-    std::complex<double>*, unsigned int); 
+    std::complex<double>*, unsigned int);
+
+  // Dev functions
+  void _print_matrix(unsigned int, const std::complex<double>*);
+  void _print_matrix(unsigned int, const double*);
+
 
 }
