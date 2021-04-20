@@ -23,11 +23,20 @@ namespace X2Chem {
     std::complex<double>* coreH; ///< Core hamiltonian
   };
   
+  //
+  // Main API calls
+  //
+
   // Compute X2C Core Hamiltonian
   void x2c_hamiltonian(const unsigned int, const Integrals&, X2COperators&, std::complex<double>*);
   
   // Boettger 2e SOC scaling factor
   void boettger_2e_soc(double*, double*);
+
+
+  //
+  // Internal subroutines
+  //
 
   // Construct 4C Core Hamiltonian
   void _build_4c_core_ham(const unsigned int, double*, std::complex<double>*, 
@@ -36,8 +45,14 @@ namespace X2Chem {
   // Form spin-orbit coupling matrix (W) 
   void _form_1e_soc_matrix(const unsigned int, std::complex<double>*, std::array<double*,4>, bool);
 
-
+  //
   // Auxilary functions
+  //
+
+  // Inverse of a matrix using LU factorization (getrf + getri)
+  void _LUinv_square(int, std::complex<double>*, int, int*);
+
+  // Set submats of larger matrix
   void _set_submat_complex(unsigned int, unsigned int, const double*, unsigned int, 
     std::complex<double>*, unsigned int); 
   void _set_submat_complex(unsigned int, unsigned int, const std::complex<double>*, unsigned int, 

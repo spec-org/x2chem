@@ -85,18 +85,34 @@ namespace X2Chem {
     std::complex<double>* CP22 = CP21   + 4*nb*nb + nb;
 
     for (auto i = 0; i < nb; i++) {
-      CP11[i + 4*nb*i] = LIGHTSPEED + p[i];
-      CP12[i + 4*nb*i] = LIGHTSPEED + p[i];
-      CP21[i + 4*nb*i] = LIGHTSPEED + p[i];
-      CP22[i + 4*nb*i] = LIGHTSPEED + p[i];
+      CP11[i + 4*nb*i] = LIGHTSPEED * p[i];
+      CP12[i + 4*nb*i] = LIGHTSPEED * p[i];
+      CP21[i + 4*nb*i] = LIGHTSPEED * p[i];
+      CP22[i + 4*nb*i] = LIGHTSPEED * p[i];
     }
 
     // Spin orbit matrix W
     _set_submat_complex(2*nb, 2*nb, W, 2*nb, core4c + 2*nb + (4*nb * 2*nb) , 4*nb);
 
+    //std::cout << "4CCH" << "\n";
     //_print_matrix(4*nb, core4c); 
 
     return;
+  }
+
+  //FIXME: Why do these lapack calls require int64_t specifically??
+  void _LUinv_square(int64_t n, std::complex<double>* A, int64_t lda, int64_t* ipiv)
+  {
+    int64_t info = lapack::getrf(n, n, A, lda, ipiv);
+    if( info == 0 ) {
+      //auto res2 = lapack::getri(n, A, lda, ipiv);
+      //std::cout << "res2: " << res2 << std::endl;
+    } else {
+      std::cerr << "LU factorization failed" << std::endl;
+      exit(1);
+    }
+
+    
   }
 
     
@@ -166,8 +182,10 @@ namespace X2Chem {
     double* K = new double[nb*nb];
     double* SCR1 = new double[nb*nb];
     double* SCR2 = new double[nb*nb];
+    std::complex<double>* X = new std::complex<double>[4*nb*nb];
     std::complex<double>* eig = new std::complex<double>[nb];
     double* beta = new double[nb];
+    int64_t* ipiv = new int64_t[2*nb];
     std::complex<double>* p = new std::complex<double>[nb];
     double* S = ints.S;
     double* T = ints.T;
@@ -179,20 +197,18 @@ namespace X2Chem {
     std::copy_n(T, nb*nb, T_copy);
     //std::fill_n(p,nb,0.0);
 
-    std::cout << "Overlap" << "\n";
-    _print_matrix(nb, S); 
-    std::cout << "Kinetic" << "\n";
-    _print_matrix(nb, T);
+    //std::cout << "Overlap" << "\n";
+    //_print_matrix(nb, S); 
+    //std::cout << "Kinetic" << "\n";
+    //_print_matrix(nb, T);
 
     // General eigen TK = SKt
     // to solve for transformation matrix K
     // T = 1C kinetic; S = 1C overlap
-    // FIXME: orthonormalize T and S first 
+    // FIXME: orthonormalize T and S first, eigvals (p) should then be real
     auto res = lapack::ggev(lapack::Job::NoVec, lapack::Job::Vec, nb, T_copy, nb, 
                             S_copy, nb, eig, beta, SCR1, nb, K, nb);
 
-    // p = sqrt(2 * t)
-    for (auto i = 0; i < nb; i++) p[i] = std::sqrt( 2 * eig[i] / beta[i] );
 
 
     // K^+ S K transform
@@ -216,12 +232,81 @@ namespace X2Chem {
                nb, nb, nb, 1.0, SCR1, nb, K, nb, 0.0, V_tilde, nb);
 
 
-    // Form spin-orbit coupling matrix W
-    // and transform
+    // Transform pV.p and pVxp integrals
+    // K^+ w K
+    for(auto mat = 0; mat < 4; mat++) {
+      blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
+                 nb, nb, nb, 1.0, K, nb, ints.pVp[mat], nb, 0.0, SCR1, nb);
+
+      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+                 nb, nb, nb, 1.0, SCR1, nb, K, nb, 0.0, ints.pVp[mat], nb);
+    }
+
+    // p^-1 = 1 / sqrt(2 * t) 
+    for (auto i = 0; i < nb; i++) p[i] = 1.0 / std::sqrt( 2 * eig[i] / beta[i] );
+
+    // Momentum transform p^-1 K^+ w K p^-1 
+    // where p^-1 is a diagonal matrix
+    for(auto mat = 0; mat < 4; mat++) {
+      for (auto i = 0; i < nb; i++) {
+        for (auto j = 0; j < nb; j++) {
+          // FIXME: once orthnormal transform is fixed, real cast wont be necessary
+          // anymore
+          ints.pVp[mat][j + i*nb] *= std::real(p[i] * p[j]);
+        }
+      }
+    }
+
+    // Form full spin-orbit coupling matrix W
     _form_1e_soc_matrix(nb, W, ints.pVp, true);
+
+
+    // Subtract out 2mc^2 from W diagonals
+    const double Wscale = 2. * LIGHTSPEED * LIGHTSPEED;
+    for(auto i = 0; i < 2*nb; i++) W[i + i*2*nb] -= Wscale;
+
+    // P^-1 -> P
+    for(auto i = 0; i < nb; i++) p[i] = 1./p[i];
 
     // Build 4C Core Hamiltonian
     _build_4c_core_ham(nb, V_tilde, p, W, core4c);
+
+    // Diagonalize 4C Core Hamiltonian
+    lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 4*nb, core4c, 4*nb, beta);
+    _print_matrix(4*nb, core4c);
+    //for (auto i = 0; i < 4*nb; i++) std::cout << "eig " << i << ": " << beta[i] << std::endl;
+    std::cout << "MOVEC" << std::endl;
+    for (auto i = 0; i < 2*nb; i++) std::cout << i << ": " << core4c[i + (2*nb)*4*nb] << " ";
+    std::cout << std::endl;
+
+    // Get large and small components of the eigenvectors
+    std::complex<double>* large = core4c + 8*nb*nb;
+    std::complex<double>* small = large + 2*nb;
+
+
+    // Compute inverse of large -> large^-1
+    _LUinv_square(2*nb, large, 4*nb, ipiv);
+    std::cout << "MOVEC" << std::endl;
+    for (auto i = 0; i < 2*nb; i++) std::cout << i << ": " << core4c[i + (2*nb)*4*nb] << " ";
+    std::cout << std::endl;
+    //_print_matrix(4*nb, core4c);
+
+
+    // X = small * large^-1
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+                 2*nb, 2*nb, 2*nb, 1.0, small, 4*nb, large, 4*nb, 0.0, X, 2*nb);
+
+    _print_matrix(2*nb, X);
+
+
+
+    
+   
+
+
+
+
+
 
   
     return;
