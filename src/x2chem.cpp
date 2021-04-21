@@ -105,7 +105,7 @@ namespace X2Chem {
   {
     int64_t info = lapack::getrf(n, n, A, lda, ipiv);
     if( info == 0 ) {
-      auto res2 = lapack::getri(n, A, lda, ipiv);
+      auto info2 = lapack::getri(n, A, lda, ipiv);
     } else {
       std::cerr << "LU factorization failed" << std::endl;
       exit(1);
@@ -302,6 +302,8 @@ namespace X2Chem {
     _LUinv_square(2*nb, large, 4*nb, ipiv);
 
     //_print_matrix(4*nb, core4c);
+  
+    /*
     std::complex<double>* TEST = new std::complex<double>[nb*nb]; 
     TEST[0] = 2;
     TEST[1] = 1;
@@ -312,6 +314,8 @@ namespace X2Chem {
     _LUinv_square(nb, TEST, nb, ipiv);
     std::cout << "TEST after" << std::endl;
     _print_matrix(nb, TEST);
+    */
+
 
     // X = small * large^-1
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
@@ -321,16 +325,16 @@ namespace X2Chem {
 
     
     // Form renormalization matrix
-    // R = sqrt(1 + X**H * X)
+    // R = sqrt(1 + X^+ * X)
 
-    // R = X**H * X
+    // R = X^+ * X
     blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
                  2*nb, 2*nb, 2*nb, 1.0, X, 2*nb, X, 2*nb, 0.0, R, 2*nb);
 
     // R = R + I
     for(auto i = 0; i < 2*nb; i++) R[i + 2*nb*i] += 1.0;
 
-    // R -> V * r * V**H
+    // Diagonalize R: R -> V * r * V^+
     lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 2*nb, R, 2*nb, beta);
 
     // CSCR -> V * r^-0.25
@@ -345,14 +349,60 @@ namespace X2Chem {
     
     std::cout << "R" << std::endl;
     _print_matrix(2*nb, R);
-   
 
 
 
+    // Construct 2C CH
+    // 2C CH = R * (V' + cp * X + X^+ * cp + X^+ * W' * X) * R
+
+    std::fill_n(output.coreH,4*nb*nb,std::complex<double>(0.));
+
+    // Copy V_tilde into spin diagonal blocks of 2C CH
+    _set_submat_complex(nb, nb, V_tilde, nb, output.coreH, 2*nb);
+    _set_submat_complex(nb, nb, V_tilde, nb, output.coreH + nb + (2*nb * nb) , 2*nb);
+
+    // SCR1 = cp * X
+    for(auto i = 0; i < 2*nb; i++)
+    for(auto j = 0; j < nb; j++) {
+      CSCR[j + 2*nb*i] = LIGHTSPEED * p[j] * X[j + 2*nb*i];
+      CSCR[j + nb + 2*nb*i] = LIGHTSPEED * p[j] * X[j + nb + 2*nb*i];
+    }
+
+    // 2C CH += SCR1 + SCR1^+
+    for(auto i = 0; i < 2*nb; i++)
+    for(auto j = 0; j < 2*nb; j++) {
+      output.coreH[j + i*2*nb] += CSCR[j + i*2*nb] + std::conj(CSCR[i + j*2*nb]);
+    }
+
+    // CSCR = X**H * W
+    blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
+                 2*nb, 2*nb, 2*nb, 1.0, X, 2*nb, W, 2*nb, 0.0, CSCR, 2*nb);
+
+    // 2C CH += CSCR * X
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+                 2*nb, 2*nb, 2*nb, 1.0, CSCR, 2*nb, X, 2*nb, 1.0, output.coreH, 2*nb);
+
+    // CSCR = 2C CH * R
+    blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
+                 2*nb, 2*nb, 2*nb, 1.0, output.coreH, 2*nb, R, 2*nb, 0.0, CSCR, 2*nb);
+
+    // 2C CH = Y * SCR1
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+                 2*nb, 2*nb, 2*nb, 1.0, R, 2*nb, CSCR, 2*nb, 0.0, output.coreH, 2*nb);
 
 
+    // Eig test
+    //lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 2*nb, output.coreH, 2*nb, beta);
+    //std::cout << "2C eigs" << std::endl;
+    //for (auto i = 0; i < 2*nb; i++) std::cout << "eig " << i << ": " << beta[i] << " ";
+    //std::cout << std::endl;
+ 
 
-  
+ 
+    // Transform 2C CH back
+
+    // Form U_X2C for picture change
+
     return;
   }
   
