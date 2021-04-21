@@ -361,14 +361,14 @@ namespace X2Chem {
     _set_submat_complex(nb, nb, V_tilde, nb, output.coreH, 2*nb);
     _set_submat_complex(nb, nb, V_tilde, nb, output.coreH + nb + (2*nb * nb) , 2*nb);
 
-    // SCR1 = cp * X
+    // CSCR = cp * X
     for(auto i = 0; i < 2*nb; i++)
     for(auto j = 0; j < nb; j++) {
       CSCR[j + 2*nb*i] = LIGHTSPEED * p[j] * X[j + 2*nb*i];
       CSCR[j + nb + 2*nb*i] = LIGHTSPEED * p[j] * X[j + nb + 2*nb*i];
     }
 
-    // 2C CH += SCR1 + SCR1^+
+    // 2C CH += CSCR + CSCR^+
     for(auto i = 0; i < 2*nb; i++)
     for(auto j = 0; j < 2*nb; j++) {
       output.coreH[j + i*2*nb] += CSCR[j + i*2*nb] + std::conj(CSCR[i + j*2*nb]);
@@ -386,7 +386,7 @@ namespace X2Chem {
     blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
                  2*nb, 2*nb, 2*nb, 1.0, output.coreH, 2*nb, R, 2*nb, 0.0, CSCR, 2*nb);
 
-    // 2C CH = Y * SCR1
+    // 2C CH = R * CSCR
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
                  2*nb, 2*nb, 2*nb, 1.0, R, 2*nb, CSCR, 2*nb, 0.0, output.coreH, 2*nb);
 
@@ -394,12 +394,49 @@ namespace X2Chem {
     // Eig test
     //lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 2*nb, output.coreH, 2*nb, beta);
     //std::cout << "2C eigs" << std::endl;
-    //for (auto i = 0; i < 2*nb; i++) std::cout << "eig " << i << ": " << beta[i] << " ";
-    //std::cout << std::endl;
+    //for (auto i = 0; i < 2*nb; i++) std::cout << "eig " << i << ": " << beta[i] << "\n";
  
 
  
-    // Transform 2C CH back
+    // Back Transform 2C CH
+    // K^-1 = S * K
+    double* SK = SCR1;
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+                 nb, nb, nb, 1.0, S, nb, K, nb, 0.0, SK, nb);
+
+    // Transform 2C CH by block
+    // Top-left
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, output.coreH, 2*nb, SK, nb, 0.0, CSCR, nb);
+
+    blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, SK, nb, CSCR, nb, 0.0, output.coreH, 2*nb);
+    
+    // Bottom-left
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, output.coreH + nb, 2*nb, SK, nb, 0.0, CSCR, nb);
+
+    blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, SK, nb, CSCR, nb, 0.0, output.coreH + nb, 2*nb);
+
+    // Top-right
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, output.coreH + 2*nb * nb, 2*nb, SK, nb, 0.0, CSCR, nb);
+
+    blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, SK, nb, CSCR, nb, 0.0, output.coreH + 2*nb * nb, 2*nb);
+
+    // Bottom-right
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, output.coreH + 2*nb * nb + nb, 2*nb, SK, nb, 0.0, CSCR, nb);
+
+    blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, SK, nb, CSCR, nb, 0.0, output.coreH + 2*nb * nb + nb, 2*nb);
+
+
+
+
+
 
     // Form U_X2C for picture change
 
