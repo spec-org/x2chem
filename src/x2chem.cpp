@@ -105,8 +105,7 @@ namespace X2Chem {
   {
     int64_t info = lapack::getrf(n, n, A, lda, ipiv);
     if( info == 0 ) {
-      //auto res2 = lapack::getri(n, A, lda, ipiv);
-      //std::cout << "res2: " << res2 << std::endl;
+      auto res2 = lapack::getri(n, A, lda, ipiv);
     } else {
       std::cerr << "LU factorization failed" << std::endl;
       exit(1);
@@ -182,9 +181,11 @@ namespace X2Chem {
     double* K = new double[nb*nb];
     double* SCR1 = new double[nb*nb];
     double* SCR2 = new double[nb*nb];
+    std::complex<double>* CSCR = new std::complex<double>[4*nb*nb];
     std::complex<double>* X = new std::complex<double>[4*nb*nb];
+    std::complex<double>* R = new std::complex<double>[4*nb*nb];
     std::complex<double>* eig = new std::complex<double>[nb];
-    double* beta = new double[nb];
+    double* beta = new double[4*nb];
     int64_t* ipiv = new int64_t[2*nb];
     std::complex<double>* p = new std::complex<double>[nb];
     double* S = ints.S;
@@ -218,6 +219,9 @@ namespace X2Chem {
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
                nb, nb, nb, 1.0, SCR1, nb, K, nb, 0.0, SCR2, nb);
 
+    std::cout << "SCR2" << std::endl;
+    _print_matrix(nb, SCR2);
+
     // Scale K by 1 / sqrt(diag( K^+ S K ))
     for (auto i = 0; i < nb; i++) 
     for (auto j = 0; j < nb; j++) 
@@ -231,6 +235,8 @@ namespace X2Chem {
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
                nb, nb, nb, 1.0, SCR1, nb, K, nb, 0.0, V_tilde, nb);
 
+    std::cout << "V_tilde" << std::endl;
+    _print_matrix(nb, V_tilde);
 
     // Transform pV.p and pVxp integrals
     // K^+ w K
@@ -270,11 +276,15 @@ namespace X2Chem {
 
     // Build 4C Core Hamiltonian
     _build_4c_core_ham(nb, V_tilde, p, W, core4c);
+    std::cout << "4C" << std::endl;
+    _print_matrix(4*nb, core4c);
 
     // Diagonalize 4C Core Hamiltonian
     lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 4*nb, core4c, 4*nb, beta);
+
+    std::cout << "4C Diag" << std::endl;
     _print_matrix(4*nb, core4c);
-    //for (auto i = 0; i < 4*nb; i++) std::cout << "eig " << i << ": " << beta[i] << std::endl;
+    for (auto i = 0; i < 4*nb; i++) std::cout << "eig " << i << ": " << beta[i] << std::endl;
     std::cout << "MOVEC" << std::endl;
     for (auto i = 0; i < 2*nb; i++) std::cout << i << ": " << core4c[i + (2*nb)*4*nb] << " ";
     std::cout << std::endl;
@@ -283,14 +293,25 @@ namespace X2Chem {
     std::complex<double>* large = core4c + 8*nb*nb;
     std::complex<double>* small = large + 2*nb;
 
+    std::cout << "MOVEC" << std::endl;
+    for (auto i = 0; i < 4*nb; i++) std::cout << i << ": " << large[i] << " ";
+    std::cout << std::endl;
+
 
     // Compute inverse of large -> large^-1
     _LUinv_square(2*nb, large, 4*nb, ipiv);
-    std::cout << "MOVEC" << std::endl;
-    for (auto i = 0; i < 2*nb; i++) std::cout << i << ": " << core4c[i + (2*nb)*4*nb] << " ";
-    std::cout << std::endl;
-    //_print_matrix(4*nb, core4c);
 
+    //_print_matrix(4*nb, core4c);
+    std::complex<double>* TEST = new std::complex<double>[nb*nb]; 
+    TEST[0] = 2;
+    TEST[1] = 1;
+    TEST[2] = 6;
+    TEST[3] = 8;
+    std::cout << "TEST before" << std::endl;
+    _print_matrix(nb, TEST);
+    _LUinv_square(nb, TEST, nb, ipiv);
+    std::cout << "TEST after" << std::endl;
+    _print_matrix(nb, TEST);
 
     // X = small * large^-1
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
@@ -298,9 +319,32 @@ namespace X2Chem {
 
     _print_matrix(2*nb, X);
 
+    
+    // Form renormalization matrix
+    // R = sqrt(1 + X**H * X)
 
+    // R = X**H * X
+    blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
+                 2*nb, 2*nb, 2*nb, 1.0, X, 2*nb, X, 2*nb, 0.0, R, 2*nb);
+
+    // R = R + I
+    for(auto i = 0; i < 2*nb; i++) R[i + 2*nb*i] += 1.0;
+
+    // R -> V * r * V**H
+    lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 2*nb, R, 2*nb, beta);
+
+    // CSCR -> V * r^-0.25
+    for(auto i = 0; i < 2*nb; i++)
+    for(auto j = 0; j < 2*nb; j++)
+      CSCR[j + 2*nb*i] = R[j + 2*nb*i] * std::pow(beta[i],-0.25);
+
+    // R = SCR1 * SCR1**H
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::ConjTrans, 
+                 2*nb, 2*nb, 2*nb, 1.0, CSCR, 2*nb, CSCR, 2*nb, 0.0, R, 2*nb);
 
     
+    std::cout << "R" << std::endl;
+    _print_matrix(2*nb, R);
    
 
 

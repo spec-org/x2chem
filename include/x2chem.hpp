@@ -50,7 +50,7 @@ namespace X2Chem {
   //
 
   // Inverse of a matrix using LU factorization (getrf + getri)
-  void _LUinv_square(int, std::complex<double>*, int, int*);
+  void _LUinv_square(int64_t, std::complex<double>*, int64_t, int64_t*);
 
   // Set submats of larger matrix
   void _set_submat_complex(unsigned int, unsigned int, const double*, unsigned int, 
