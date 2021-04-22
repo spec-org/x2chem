@@ -78,7 +78,6 @@ namespace X2Chem {
     _set_submat_complex(nb, nb, V, nb, core4c + nb + (4*nb * nb) , 4*nb);
     
     // Off-diagonal c*p terms
-    // FIXME pick better variable names
     std::complex<double>* CP11 = core4c + 8*nb*nb;
     std::complex<double>* CP12 = CP11   + 4*nb*nb + nb;
     std::complex<double>* CP21 = core4c + 2*nb;
@@ -171,9 +170,12 @@ namespace X2Chem {
   void x2c_hamiltonian(const unsigned int nb, const Integrals& ints,
     X2COperators& output, std::complex<double>* core4c)
   {
-  
+      
+    std::cout.precision(11);
+
     //const double* S = ints.S;
-    std::complex<double>* U = output.U;
+    std::complex<double>* UL = output.UL;
+    std::complex<double>* US = output.US;
     
     std::complex<double>* W = new std::complex<double>[4*nb*nb];
     std::fill_n(W,4*nb*nb,std::complex<double>(0.,1.));
@@ -196,12 +198,8 @@ namespace X2Chem {
     double* V_tilde = new double[nb*nb]; 
     std::copy_n(S, nb*nb, S_copy);
     std::copy_n(T, nb*nb, T_copy);
-    //std::fill_n(p,nb,0.0);
 
-    //std::cout << "Overlap" << "\n";
-    //_print_matrix(nb, S); 
-    //std::cout << "Kinetic" << "\n";
-    //_print_matrix(nb, T);
+
 
     // General eigen TK = SKt
     // to solve for transformation matrix K
@@ -209,8 +207,6 @@ namespace X2Chem {
     // FIXME: orthonormalize T and S first, eigvals (p) should then be real
     auto res = lapack::ggev(lapack::Job::NoVec, lapack::Job::Vec, nb, T_copy, nb, 
                             S_copy, nb, eig, beta, SCR1, nb, K, nb);
-
-
 
     // K^+ S K transform
     blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
@@ -227,7 +223,7 @@ namespace X2Chem {
     for (auto j = 0; j < nb; j++) 
       K[j + nb*i] /= std::sqrt(SCR2[i + i*nb]);
 
-    // Transform non-rel potential V
+    // Transform non-rel potential V -> V_tilde
     // K^+ V K
     blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
                nb, nb, nb, 1.0, K, nb, V, nb, 0.0, SCR1, nb);
@@ -435,14 +431,22 @@ namespace X2Chem {
 
 
 
-
-
-
     // Form U_X2C for picture change
 
     return;
   }
   
+  // Form picture change unitary matrices UL and US
+  void _form_U(const unsigned int nb, std::complex<double>* UL, std::complex<double>* US,
+               double* K, double* SK, std::complex<double>* X, std::complex<double>* R, 
+               std::complex<double>* p) 
+  {
+
+
+    return;
+  }
+
+
   void boettger_2e_soc(double *basis, double *coreH)
   {
     return;

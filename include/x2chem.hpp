@@ -14,12 +14,13 @@ namespace X2Chem {
     double* S;                  ///< Overlap
     double* T;                  ///< Kinetic
     double* V;                  ///< Nuclear potential
-    std::array<double*,4> pVp;  ///< Spin-orbit
+    std::array<double*,4> pVp;  ///< Spin-orbit PV.P, PVxP(X), PVxP(Y), PVxP(Z) 
   };
 
   // Operators output by x2c_hamiltonian
   struct X2COperators {
-    std::complex<double>* U;     ///< Transformation matrix
+    std::complex<double>* UL;     ///< L Transformation matrix
+    std::complex<double>* US;     ///< S Transformation matrix
     std::complex<double>* coreH; ///< Core hamiltonian
   };
   
@@ -44,6 +45,11 @@ namespace X2Chem {
 
   // Form spin-orbit coupling matrix (W) 
   void _form_1e_soc_matrix(const unsigned int, std::complex<double>*, std::array<double*,4>, bool);
+
+  // Form picture change unitary matrices UL and US
+  void _form_U(const unsigned int, std::complex<double>*, std::complex<double>*,
+               double*, double*, std::complex<double>*, std::complex<double>*, 
+               std::complex<double>*);
 
   //
   // Auxilary functions
