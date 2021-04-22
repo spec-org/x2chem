@@ -35,6 +35,7 @@ namespace X2Chem {
   void boettger_2e_soc(double*, double*);
 
 
+
   //
   // Internal subroutines
   //
@@ -49,7 +50,8 @@ namespace X2Chem {
   // Form picture change unitary matrices UL and US
   void _form_U(const unsigned int, std::complex<double>*, std::complex<double>*,
                double*, double*, std::complex<double>*, std::complex<double>*, 
-               std::complex<double>*);
+               std::complex<double>*, std::complex<double>*);
+
 
   //
   // Auxilary functions

@@ -317,8 +317,6 @@ namespace X2Chem {
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
                  2*nb, 2*nb, 2*nb, 1.0, small, 4*nb, large, 4*nb, 0.0, X, 2*nb);
 
-    _print_matrix(2*nb, X);
-
     
     // Form renormalization matrix
     // R = sqrt(1 + X^+ * X)
@@ -432,6 +430,7 @@ namespace X2Chem {
 
 
     // Form U_X2C for picture change
+    _form_U(nb, output.UL, output.US, K, SK, X, R, p, CSCR); 
 
     return;
   }
@@ -439,10 +438,84 @@ namespace X2Chem {
   // Form picture change unitary matrices UL and US
   void _form_U(const unsigned int nb, std::complex<double>* UL, std::complex<double>* US,
                double* K, double* SK, std::complex<double>* X, std::complex<double>* R, 
-               std::complex<double>* p) 
+               std::complex<double>* p, std::complex<double>* SCR) 
   {
 
+    // Form UL = K * R * K^-1
+    // Top-left
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, R, 2*nb, SK, nb, 0.0, SCR, nb);
 
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, K, nb, SCR, nb, 0.0, UL, 2*nb);
+
+    // Bottom-left
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, R + nb, 2*nb, SK, nb, 0.0, SCR, nb);
+
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, K, nb, SCR, nb, 0.0, UL + nb, 2*nb);
+
+    // Top-right
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, R + 2*nb * nb, 2*nb, SK, nb, 0.0, SCR, nb);
+
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, K, nb, SCR, nb, 0.0, UL + 2*nb * nb, 2*nb);
+
+    // Bottom-right
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, R + 2*nb * nb + nb, 2*nb, SK, nb, 0.0, SCR, nb);
+
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, K, nb, SCR, nb, 0.0, UL + 2*nb * nb + nb, 2*nb);
+
+
+    // Form US = K * 2cp^-1 * X * R * K^-1
+    // (Overwrites R)
+
+    // X*R -> R
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               2*nb, 2*nb, 2*nb, 1.0, X, 2*nb, R, 2*nb, 0.0, R, 2*nb);
+    std::cout << "R" << std::endl;
+    _print_matrix(2*nb, R);
+
+    // R = 2 * c * p^-1 * R  
+    for(auto i = 0; i < 2*nb; i++)
+    for(auto j = 0; j < nb; j++) {
+      R[j + 2*nb*i] = 2*LIGHTSPEED * (1./p[j]) * R[j + 2*nb*i];
+      R[j + nb + 2*nb*i] = 2*LIGHTSPEED * (1./p[j]) * R[j + nb + 2*nb*i];
+    }
+
+    // Transform K * R * K^-1
+    // where R = 2 * c * p^-1 * R * X
+    // Top-left
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, R, 2*nb, SK, nb, 0.0, SCR, nb);
+
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, K, nb, SCR, nb, 0.0, US, 2*nb);
+
+    // Bottom-left
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, R + nb, 2*nb, SK, nb, 0.0, SCR, nb);
+
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, K, nb, SCR, nb, 0.0, US + nb, 2*nb);
+
+    // Top-right
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, R + 2*nb * nb, 2*nb, SK, nb, 0.0, SCR, nb);
+
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, K, nb, SCR, nb, 0.0, US + 2*nb * nb, 2*nb);
+
+    // Bottom-right
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, R + 2*nb * nb + nb, 2*nb, SK, nb, 0.0, SCR, nb);
+
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, K, nb, SCR, nb, 0.0, US + 2*nb * nb + nb, 2*nb);
     return;
   }
 
