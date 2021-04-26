@@ -57,18 +57,37 @@ namespace X2Chem {
   // Auxilary functions
   //
 
-  // Inverse of a matrix using LU factorization (getrf + getri)
-  void _LUinv_square(int64_t, std::complex<double>*, int64_t, int64_t*);
+  namespace detail {
 
-  // Set submats of larger matrix
-  void _set_submat_complex(unsigned int, unsigned int, const double*, unsigned int, 
-    std::complex<double>*, unsigned int); 
-  void _set_submat_complex(unsigned int, unsigned int, const std::complex<double>*, unsigned int, 
-    std::complex<double>*, unsigned int);
+    // Inverse of a matrix using LU factorization (getrf + getri)
+    void LUinv_square(int64_t, std::complex<double>*, int64_t, int64_t*);
 
-  // Dev functions
-  void _print_matrix(unsigned int, const std::complex<double>*);
-  void _print_matrix(unsigned int, const double*);
+    // Set submats of larger matrix
+    template <typename sourceT, typename destT>
+    void set_submat(unsigned int n, unsigned int m, const sourceT* A,
+      unsigned int LDA, destT* B, unsigned int LDB)
+    {
+      for (auto i = 0; i < m; i++)
+      for (auto j = 0; j < n; j++) {
+          B[i*LDB + j] = destT(A[i*LDA + j]);
+      }
+    }
 
+    // Dev functions
+    template <typename T>
+    void print_matrix(unsigned int N, const T* matrix)
+    {
+      // Print matrix column major
+      for (auto i = 0; i < N; i++) {
+        std::cout << "Row " << i << ":  ";
+        for (auto j = 0; j < N; j++) {
+          std::cout << matrix[j*N + i] << " ";
+        }
+        std::cout << std::endl;
+      }
+
+    }
+
+  }
 
 }

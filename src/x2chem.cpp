@@ -6,62 +6,23 @@
 
 namespace X2Chem {
 
-  // Real part of A is written to arbitrary subblock of B
-  //
-  //                         [. . .]  
-  // real(A) -> complex(B) = [. A .]
-  //                         [. . .]
-  //
-  void _set_submat_complex(unsigned int n, unsigned int m, const double* A, unsigned int LDA, 
-    std::complex<double>* B, unsigned int LDB) 
-  {
-    for (auto i = 0; i < m; i++)
-    for (auto j = 0; j < n; j++) {
-        B[i*LDB + j] = std::complex<double>(A[i*LDA + j],0.0);
-    }
-  }
+  namespace detail {
 
-  // Complex matrix A is written to arbitrary subblock of B
-  //
-  //                            [. . .]  
-  // complex(A) -> complex(B) = [. A .]
-  //                            [. . .]
-  //
-  void _set_submat_complex(unsigned int n, unsigned int m, const std::complex<double>* A, unsigned int LDA, 
-    std::complex<double>* B, unsigned int LDB) 
-  {
-    for (auto i = 0; i < m; i++)
-    for (auto j = 0; j < n; j++) {
-        B[i*LDB + j] = A[i*LDA + j];
-    }
-  }
-
-
-  void _print_matrix(unsigned int N, const std::complex<double>* matrix)
-  {
-    // Print matrix column major
-    for (auto i = 0; i < N; i++) {
-      std::cout << "Row " << i << ":  ";
-      for (auto j = 0; j < N; j++) {
-        std::cout << matrix[j*N + i] << " ";
+    //FIXME: Why do these lapack calls require int64_t specifically??
+    void LUinv_square(int64_t n, std::complex<double>* A, int64_t lda, int64_t* ipiv)
+    {
+      int64_t info = lapack::getrf(n, n, A, lda, ipiv);
+      if( info == 0 ) {
+        auto info2 = lapack::getri(n, A, lda, ipiv);
+      } else {
+        std::cerr << "LU factorization failed" << std::endl;
+        exit(1);
       }
-      std::cout << std::endl;
+
+      
     }
 
-  }
-
-  void _print_matrix(unsigned int N, const double* matrix)
-  {
-    // Print matrix column major
-    for (auto i = 0; i < N; i++) {
-      std::cout << "Row " << i << ":  ";
-      for (auto j = 0; j < N; j++) {
-        std::cout << matrix[j*N + i] << " ";
-      }
-      std::cout << std::endl;
-    }
-
-  }
+  } // namespace detail
 
 
   void _build_4c_core_ham(const unsigned int nb, double* V, std::complex<double>* p, 
@@ -74,8 +35,8 @@ namespace X2Chem {
     // Set proper matrices to subblocks of 4C Hamiltonian
     
     // Transformed 1C potential V 
-    _set_submat_complex(nb, nb, V, nb, core4c, 4*nb);
-    _set_submat_complex(nb, nb, V, nb, core4c + nb + (4*nb * nb) , 4*nb);
+    detail::set_submat(nb, nb, V, nb, core4c, 4*nb);
+    detail::set_submat(nb, nb, V, nb, core4c + nb + (4*nb * nb) , 4*nb);
     
     // Off-diagonal c*p terms
     std::complex<double>* CP11 = core4c + 8*nb*nb;
@@ -91,7 +52,7 @@ namespace X2Chem {
     }
 
     // Spin orbit matrix W
-    _set_submat_complex(2*nb, 2*nb, W, 2*nb, core4c + 2*nb + (4*nb * 2*nb) , 4*nb);
+    detail::set_submat(2*nb, 2*nb, W, 2*nb, core4c + 2*nb + (4*nb * 2*nb) , 4*nb);
 
     //std::cout << "4CCH" << "\n";
     //_print_matrix(4*nb, core4c); 
@@ -99,21 +60,6 @@ namespace X2Chem {
     return;
   }
 
-  //FIXME: Why do these lapack calls require int64_t specifically??
-  void _LUinv_square(int64_t n, std::complex<double>* A, int64_t lda, int64_t* ipiv)
-  {
-    int64_t info = lapack::getrf(n, n, A, lda, ipiv);
-    if( info == 0 ) {
-      auto info2 = lapack::getri(n, A, lda, ipiv);
-    } else {
-      std::cerr << "LU factorization failed" << std::endl;
-      exit(1);
-    }
-
-    
-  }
-
-    
   void _form_1e_soc_matrix(const unsigned int nb, std::complex<double>* W, 
                            std::array<double*,4> pVp, bool soc)
   {
@@ -216,7 +162,7 @@ namespace X2Chem {
                nb, nb, nb, 1.0, SCR1, nb, K, nb, 0.0, SCR2, nb);
 
     std::cout << "SCR2" << std::endl;
-    _print_matrix(nb, SCR2);
+    detail::print_matrix(nb, SCR2);
 
     // Scale K by 1 / sqrt(diag( K^+ S K ))
     for (auto i = 0; i < nb; i++) 
@@ -232,7 +178,7 @@ namespace X2Chem {
                nb, nb, nb, 1.0, SCR1, nb, K, nb, 0.0, V_tilde, nb);
 
     std::cout << "V_tilde" << std::endl;
-    _print_matrix(nb, V_tilde);
+    detail::print_matrix(nb, V_tilde);
 
     // Transform pV.p and pVxp integrals
     // K^+ w K
@@ -245,7 +191,7 @@ namespace X2Chem {
     }
 
     // p^-1 = 1 / sqrt(2 * t) 
-    for (auto i = 0; i < nb; i++) p[i] = 1.0 / std::sqrt( 2 * eig[i] / beta[i] );
+    for (auto i = 0; i < nb; i++) p[i] = 1. / std::sqrt( 2. * eig[i] / beta[i] );
 
     // Momentum transform p^-1 K^+ w K p^-1 
     // where p^-1 is a diagonal matrix
@@ -273,13 +219,13 @@ namespace X2Chem {
     // Build 4C Core Hamiltonian
     _build_4c_core_ham(nb, V_tilde, p, W, core4c);
     std::cout << "4C" << std::endl;
-    _print_matrix(4*nb, core4c);
+    detail::print_matrix(4*nb, core4c);
 
     // Diagonalize 4C Core Hamiltonian
     lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 4*nb, core4c, 4*nb, beta);
 
     std::cout << "4C Diag" << std::endl;
-    _print_matrix(4*nb, core4c);
+    detail::print_matrix(4*nb, core4c);
     for (auto i = 0; i < 4*nb; i++) std::cout << "eig " << i << ": " << beta[i] << std::endl;
     std::cout << "MOVEC" << std::endl;
     for (auto i = 0; i < 2*nb; i++) std::cout << i << ": " << core4c[i + (2*nb)*4*nb] << " ";
@@ -295,7 +241,7 @@ namespace X2Chem {
 
 
     // Compute inverse of large -> large^-1
-    _LUinv_square(2*nb, large, 4*nb, ipiv);
+    detail::LUinv_square(2*nb, large, 4*nb, ipiv);
 
     //_print_matrix(4*nb, core4c);
   
@@ -342,7 +288,7 @@ namespace X2Chem {
 
     
     std::cout << "R" << std::endl;
-    _print_matrix(2*nb, R);
+    detail::print_matrix(2*nb, R);
 
 
 
@@ -352,8 +298,8 @@ namespace X2Chem {
     std::fill_n(output.coreH,4*nb*nb,std::complex<double>(0.));
 
     // Copy V_tilde into spin diagonal blocks of 2C CH
-    _set_submat_complex(nb, nb, V_tilde, nb, output.coreH, 2*nb);
-    _set_submat_complex(nb, nb, V_tilde, nb, output.coreH + nb + (2*nb * nb) , 2*nb);
+    detail::set_submat(nb, nb, V_tilde, nb, output.coreH, 2*nb);
+    detail::set_submat(nb, nb, V_tilde, nb, output.coreH + nb + (2*nb * nb) , 2*nb);
 
     // CSCR = cp * X
     for(auto i = 0; i < 2*nb; i++)
@@ -478,7 +424,7 @@ namespace X2Chem {
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
                2*nb, 2*nb, 2*nb, 1.0, X, 2*nb, R, 2*nb, 0.0, R, 2*nb);
     std::cout << "R" << std::endl;
-    _print_matrix(2*nb, R);
+    detail::print_matrix(2*nb, R);
 
     // R = 2 * c * p^-1 * R  
     for(auto i = 0; i < 2*nb; i++)
