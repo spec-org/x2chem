@@ -37,3 +37,6 @@ include( HandleLinAlg )
 #------------------------------------------------------------------------------
 
 add_subdirectory(src)
+
+add_executable( a.out "${PROJECT_SOURCE_DIR}/main.cpp" )
+target_link_libraries( a.out PUBLIC x2chem )
