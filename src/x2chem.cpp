@@ -19,7 +19,6 @@ namespace X2Chem {
         exit(1);
       }
 
-      
     }
 
   } // namespace detail
@@ -470,5 +469,54 @@ namespace X2Chem {
   {
     return;
   }
+
+  /**
+   * @brief Orthonormalizes a matrix and gives the transformation matrix
+   *
+   * Orthonormalizes basisMat and gives the transformation matrix.
+   * Assumes square matrix that is contiguous in memory.
+   * Truncates vectors with less than screen singular value,
+   * and returns the number of basis vectors left after truncation.
+   *
+   * @param[in]   N         Dimension of basis
+   * @param[in]   basisMat  Basis matrix for the orthonormalization (N x N)
+   * @param[in]   scratch   Scratch space (N)
+   * @param[in]   screen    Minimum singular value for keeping orthogonal
+   *                        vectors
+   *
+   * @returns     Number of significant basis functions remaining
+   **/
+  template <typename T>
+  int64_t orthonormalize(int64_t N, T* basisMat, double* scratch, double screen)
+  {
+
+    // Do the SVD
+    int64_t code = lapack::gesvd(lapack::Job::OverwriteVec, lapack::Job::NoVec,
+                                 N, N, basisMat, N, scratch, nullptr, N, nullptr, N);
+    if( code != 0 )
+      throw LinAlgExcept("GESVD", code);
+
+    // Find number of singular values above tolerance
+    int64_t nSigVec = std::distance(
+        scratch,
+        std::find_if(scratch, scratch+N,
+          [&](double x){ return x < screen; }
+        )
+    );
+
+    // Scale columns of transMat by 1/sqrt(s)
+    for(auto i = 0; i < nSigVec; i++) {
+      blas::scal(N, T(1.)/std::sqrt(scratch[i]), basisMat + i*N, 1);
+    }
+
+    return nSigVec;
+
+  }
+
+  template<>
+  int64_t orthonormalize(int64_t, double*, double*, double);
+
+  template<>
+  int64_t orthonormalize(int64_t, std::complex<double>*, double*, double);
 
 } // namespace X2Chem

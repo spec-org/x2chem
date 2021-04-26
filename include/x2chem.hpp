@@ -2,6 +2,8 @@
 
 #include <array>
 #include <complex>
+#include <stdexcept>
+#include <string>
 
 namespace X2Chem {
 
@@ -23,6 +25,29 @@ namespace X2Chem {
     std::complex<double>* US;     ///< S Transformation matrix
     std::complex<double>* coreH; ///< Core hamiltonian
   };
+
+  // Exception from bad linear algebra
+  class LinAlgExcept : virtual public std::runtime_error {
+
+    int64_t code;
+    std::string name;
+    std::string message;
+
+    public:
+
+    LinAlgExcept(std::string function_name, int64_t exit_code) :
+      code(exit_code), name(function_name), std::runtime_error("") {
+      message = "Linear algebra function " + function_name
+                + " exited with code " + std::to_string(exit_code);
+    }
+
+    LinAlgExcept() = delete;
+
+    int64_t exit_code() { return code; }
+    const std::string& function_name() { return name; }
+    const char* what() const noexcept { return message.c_str(); }
+
+  };
   
   //
   // Main API calls
@@ -34,6 +59,8 @@ namespace X2Chem {
   // Boettger 2e SOC scaling factor
   void boettger_2e_soc(double*, double*);
 
+  template <typename T>
+  int64_t orthonormalize(int64_t, T*, double*, double);
 
 
   //
