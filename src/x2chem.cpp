@@ -10,13 +10,14 @@ namespace X2Chem {
 
     void LUinv_square(int64_t n, std::complex<double>* A, int64_t lda, int64_t* ipiv)
     {
-      int64_t info = lapack::getrf(n, n, A, lda, ipiv);
-      if( info == 0 ) {
-        auto info2 = lapack::getri(n, A, lda, ipiv);
-      } else {
-        std::cerr << "LU factorization failed" << std::endl;
-        exit(1);
-      }
+
+      auto info = lapack::getrf(n, n, A, lda, ipiv);
+      if(info != 0)
+        throw LinAlgExcept("GETRF", info);
+
+      info = lapack::getri(n, A, lda, ipiv);
+      if(info != 0)
+        throw LinAlgExcept("GETRI", info);
 
     }
 
