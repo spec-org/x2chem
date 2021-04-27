@@ -8,7 +8,6 @@ namespace X2Chem {
 
   namespace detail {
 
-    //FIXME: Why do these lapack calls require int64_t specifically??
     void LUinv_square(int64_t n, std::complex<double>* A, int64_t lda, int64_t* ipiv)
     {
       int64_t info = lapack::getrf(n, n, A, lda, ipiv);
@@ -59,6 +58,32 @@ namespace X2Chem {
     return;
   }
 
+
+  /**
+   * @brief Builds the 1e spin-orbit coupling (SOC) matrix from 
+   *        real 1C pVp integrals, corresponding to the bottom right 
+   *        block of the 4C Hamiltonian. 
+   *
+   * Modifies the W pointer, and assumes W is 2*nb x 2*nb 
+   * in dimension and is contiguous in memory. The W matrix
+   * is formed by 4 different nb x nb blocks. 
+   *
+   *      [ pV.p + i (pVxp)(Z)        |  (pVxp)(Y) + i (pVxp)(X) ]
+   *  W = [ ------------------------  |  ----------------------- ]
+   *      [ -(pVxp)(Y) + i (pVxp)(X)  |  pV.p - i (pVxp)(Z)      ]
+   *
+   *
+   * @param[in]   nb        Number of spatial basis functions
+   * @param[in]   W         Pointer to the W 1e SOC Matrix
+   * @param[in]   pVp       Array of 4 pointers to each real pVp 
+   *                        matrix input by the user, ordered 
+   *                        pV.p, pVxp(X), pVxp(Y), pVxp(Z)
+   * @param[in]   soc       Boolean where true computes the full
+   *                        1e SOC matrix, false only computes the 
+   *                        on diagonal blocks for scalar relativity
+   *                        without SOC.
+   *
+   **/
   void _form_1e_soc_matrix(const int64_t nb, std::complex<double>* W, 
                            std::array<double*,4> pVp, bool soc)
   {
@@ -93,16 +118,22 @@ namespace X2Chem {
       // W = [ W1  0  ]
       //     [ 0   W4 ]
       std::complex<double> *W1 = W;
-      std::complex<double> *W4 = W1 + 2*nb*nb + nb;
+      std::complex<double> *W2 = W1 + 2*nb*nb;
+      std::complex<double> *W3 = W1 + nb;
+      std::complex<double> *W4 = W2 + nb;
 
       for(auto i = 0; i < nb; i++) {
         for(auto j = 0; j < nb; j++) {
 
           // W1 = pV.p 
-          W1[j + i*2*nb] =  pVp[0][j + i*nb];
+          W1[j + i*2*nb] = pVp[0][j + i*nb];
 
           // W4 = pV.p
-          W4[j + i*2*nb] =  pVp[0][j + i*nb];
+          W4[j + i*2*nb] = pVp[0][j + i*nb];
+
+          // Zero out W2 and W3 blocks
+          W2[j + i*2*nb] = 0.0;
+          W3[j + i*2*nb] = 0.0;
         }
       }
     

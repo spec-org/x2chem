@@ -8,25 +8,25 @@ using namespace X2Chem;
 TEST( Boettger, UH_91p ) {
 
   // Boettger test using the following CQ input
-  // [Molecule]                                                                                                            
-  // charge = 91                                                                                                           
-  // mult = 1                                                                                                              
-  // geom:                                                                                                                 
-  //  H   0.0  0.0  0.0                                                                                                    
-  //  U   0.0  0.0  0.9                                                                                                    
-  //                                                                                                                       
-  // [BASIS]                                                                                                               
-  // definebasis = on                                                                                                      
-  // basisdef:                                                                                                             
-  //  ****                                                                                                                 
-  //  H     0                                                                                                              
-  //  S    1   1.00                                                                                                        
-  //        0.6239137298     1.0                                                                                           
-  //  ****                                                                                                                 
-  //  U     0                                                                                                              
-  //  P    1   1.00                                                                                                        
-  //        0.2     1.0                                                                                                    
-  //  ****           
+  // [Molecule]
+  // charge = 91
+  // mult = 1
+  // geom:
+  //  H   0.0  0.0  0.0
+  //  U   0.0  0.0  0.9
+  //
+  // [BASIS]
+  // definebasis = on
+  // basisdef:
+  //  ****
+  //  H     0
+  //  S    1   1.00
+  //        0.6239137298     1.0
+  //  ****
+  //  U     0
+  //  P    1   1.00
+  //        0.2     1.0
+  //  ****
 
   // Define test parameters
   int64_t nb = 4;
@@ -45,9 +45,9 @@ TEST( Boettger, UH_91p ) {
   angList[1] = 1;
   angList[2] = 1;
   angList[3] = 1;
- 
+
   // Raw X2C Core Hamiltonian Output from CQ
-  std::fill_n(core_test,4*nb*nb,0.0); 
+  std::fill_n(core_test,4*nb*nb,0.0);
   core_test[0] = -5.40279938e+01;
   core_test[3] =  2.95646047e+01;
   core_test[5] =  1.91149027e-04;
@@ -90,7 +90,7 @@ TEST( Boettger, UH_91p ) {
   core_test[58] = std::complex<double>(0.,-2.33394696e-04);
 
   // Expected output after Boettger from CQ
-  std::fill_n(expected,4*nb*nb,0.0); 
+  std::fill_n(expected,4*nb*nb,0.0);
   expected[0] = -5.40279938e+01;
   expected[3] =  2.95646047e+01;
   expected[5] =  1.91149027e-04;
@@ -134,16 +134,20 @@ TEST( Boettger, UH_91p ) {
 
   // Run boettger
   boettger_2e_soc(nb, core_test, nucList, angList);
- 
+
   // Compare Hamiltonian matrices
   for( auto i = 0; i < 2*nb; i++ ) {
     for( auto j = 0; j < 2*nb; j++ ) {
       double difference = std::abs(expected[j + i*2*nb] - core_test[j + i*2*nb]);
-      std::cout << "Computed CoreH[" << j << "," << i << "]: " << core_test[j + i*2*nb] <<"\n"; 
-      std::cout << "Expected CoreH[" << j << "," << i << "]: " << expected[j + i*2*nb] <<"\n"; 
+      std::cout << "Computed CoreH[" << j << "," << i << "]: " << core_test[j + i*2*nb] <<"\n";
+      std::cout << "Expected CoreH[" << j << "," << i << "]: " << expected[j + i*2*nb] <<"\n";
       EXPECT_LT(difference, 1e-12);
     }
   }
 
+  free(nucList);
+  free(angList);
+  free(core_test);
+  free(expected);
 }
 
