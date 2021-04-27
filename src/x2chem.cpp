@@ -464,11 +464,29 @@ namespace X2Chem {
     return;
   }
 
-
+  /**
+   * @brief Scales the X2C core Hamiltonian using
+   *        the Boettger 2-electron spin-orbit coupling
+   *        formula. 
+   *
+   * Modifies the X2C core Hamiltonian in place with computed
+   * Boettger values to approximate two-electron spin-orbit
+   * coupling. Assumes coreH is 2*nb x 2*nb in dimension and
+   * is contiguous in memory.
+   *
+   * @param[in]   nb        Number of spatial basis functions
+   * @param[in]   coreH     Pointer to the X2C Core Hamiltonian
+   * @param[in]   nucList   Pointer to an nb-length array of atomic nuclear charge
+   *                        values associated with each spatial basis function.
+   * @param[in]   angList   Pointer to an nb-length array of angular momentum
+   *                        values for each spatial basis function.
+   *
+   **/
   void boettger_2e_soc(int64_t nb, std::complex<double>* coreH, double* nucList, int64_t* angList)
   {
 
     std::complex<double> factor;
+    std::complex<double> on_diag;
 
     // Blocks of the X2C Core Hamiltonian
     std::complex<double>* HAA = coreH;
@@ -484,12 +502,13 @@ namespace X2Chem {
       for( auto j = 0; j < nb; j++ ) {
 
         // Compute factor f
-        factor = -1.0 * std::sqrt( Ql[angList[i]] * Ql[angList[j]] / nucList[i] / nucList[j]);
-        //std::cout << "factor: " << factor << "\n";
+        factor = -1.0 * std::sqrt( Ql[angList[j]] * Ql[angList[i]] / nucList[j] / nucList[i]);
+        std::cout << "factor: " << factor << "\n";
 
         // Scale elements of each block
-        HAA[j + i*2*nb] += (factor / 2.0) * (HAA[j + i*2*nb] - HBB[j + i*2*nb]);
-        HBB[j + i*2*nb] -= (factor / 2.0) * (HAA[j + i*2*nb] - HBB[j + i*2*nb]);
+        on_diag = (factor / 2.0) * (HAA[j + i*2*nb] - HBB[j + i*2*nb]);
+        HAA[j + i*2*nb] += on_diag;
+        HBB[j + i*2*nb] -= on_diag;
         HAB[j + i*2*nb] += factor * HAB[j + i*2*nb];
         HBA[j + i*2*nb] += factor * HBA[j + i*2*nb];
 
