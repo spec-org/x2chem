@@ -513,10 +513,7 @@ namespace X2Chem {
 
   }
 
-  template<>
-  int64_t orthonormalize(int64_t, double*, double*, double);
-
-  template<>
-  int64_t orthonormalize(int64_t, std::complex<double>*, double*, double);
+  template int64_t orthonormalize<double>(int64_t, double*, double*, double);
+  template int64_t orthonormalize<std::complex<double>>(int64_t, std::complex<double>*, double*, double);
 
 } // namespace X2Chem
