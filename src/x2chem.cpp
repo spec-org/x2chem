@@ -583,7 +583,7 @@ namespace X2Chem {
         )
     );
 
-    // Scale columns of transMat by 1/sqrt(s)
+    // Scale columns of basisMat by 1/sqrt(s)
     for(auto i = 0; i < nSigVec; i++) {
       blas::scal(N, T(1.)/std::sqrt(scratch[i]), basisMat + i*N, 1);
     }

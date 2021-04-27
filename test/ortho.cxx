@@ -1,6 +1,11 @@
+#include <algorithm>
+
 #include <gtest/gtest.h>
 
+#include <blas.hh>
+
 #include <x2chem.hpp>
+
 
 using namespace X2Chem;
 
@@ -46,6 +51,7 @@ TEST( Orthonormal, I_double ) {
 
   auto nVec = orthonormalize(3, in, scr, 0.);
   check_3x3_ortho(nVec, in, expected);
+
 }
 
 TEST( Orthonormal, I_dcomplex ) {
@@ -67,6 +73,7 @@ TEST( Orthonormal, I_dcomplex ) {
 
   auto nVec = orthonormalize(3, in, scr, 0.);
   check_3x3_ortho(nVec, in, expected);
+
 }
 
 TEST( Orthonormal, Scale_double ) {
@@ -144,6 +151,7 @@ TEST( Orthonormal, Scale_dcomplex ) {
 }
 
 TEST( Orthonormal, Throws ) {
+
   double in[9];
   double scr[3];
 
@@ -159,19 +167,89 @@ TEST( Orthonormal, Throws ) {
     std::cout << "What: " << e.what() << std::endl;
   }
 
-  std::fill_n(in, 9, 0.);
-  in[0] = 1.;
-  in[4] = 1.;
-  in[7] = 1.;
-  in[8] = 1e-16;
-
-  auto nVec = orthonormalize(3, in, scr, 1e-12);
-  std::cout << "nVec: " << nVec;
-
-  detail::print_matrix(3, in);
 }
 
 TEST( Orthonormal, Trim ) {
 
+  double in[9];
+  double scr[3];
+
+  std::fill_n(in, 9, 0.);
+  in[0] = 1.;
+  in[4] = 1.;
+  in[5] = 1.;
+  in[7] = 1.;
+  in[8] = 1.;
+
+  auto nVec = orthonormalize(3, in, scr, 1e-12);
+
+  std::cout << "nVec: " << nVec << std::endl;
+  detail::print_matrix(3, in);
+
+  EXPECT_EQ(nVec, 2);
+
+}
+
+TEST( Orthonormal, Orthonormalize ) {
+
+  double in[25];
+  double scr[5];
+  double copy[25];
+
+  std::fill_n(in, 25, 0.);
+  
+  // set diagonal to 1,2,3,4,5
+  for( auto i = 0; i < 5; i++ )
+    in[i*6] = double(i+1);
+
+  // Add some off diagonal "noise"
+  in[1] = 0.5;
+  in[5] = 0.5;
+
+  in[4] = 0.75;
+  in[20] = 0.75;
+
+  // Make vectors 2 and 3 linearly dependent
+  in[18] = 1./3.;
+  in[13] = 1.;
+  in[17] = 1.;
+
+  in[2] = 1.5;
+  in[10] = 1.5;
+  in[7] = 0.75;
+  in[11] = 0.75;
+
+  in[3] = 0.5;
+  in[15] = 0.5;
+  in[8] = 0.25;
+  in[16] = 0.25;
+
+  // Create copy (since orthonormalize destroys it)
+  std::copy_n(in, 25, copy);
+
+  std::cout << "Original matrix:" << std::endl;
+  detail::print_matrix(5, in);
+
+  auto nVec = orthonormalize(5, in, scr, 1e-12);
+
+  std::cout << "\nnVec: " << nVec << std::endl;
+  std::cout << "Transformation matrix:" << std::endl;
+  detail::print_matrix(5, in);
+
+  // Check that linearly dependent vectors are trimmed
+  EXPECT_EQ(nVec, 4);
+
+  double out[16];
+  double tmp[20];
+
+  // Verify that U\dag S U is identity
+  blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans,
+             4, 5, 5, 1.0, in, 5, copy, 5, 0., tmp, 4);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             4, 4, 5, 1.0, tmp, 4, in, 5, 0., out, 4);
+
+  for( auto i = 0; i < 16; i++ ) {
+    EXPECT_NEAR(out[i], i % 5 == 0 ? 1. : 0., 1e-12);
+  }
 
 }

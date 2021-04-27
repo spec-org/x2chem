@@ -2,6 +2,7 @@
 
 #include <array>
 #include <complex>
+#include <iomanip>
 #include <stdexcept>
 #include <string>
 
@@ -104,11 +105,13 @@ namespace X2Chem {
     template <typename T>
     void print_matrix(const int64_t N, const T* matrix)
     {
+
+      std::cout << std::scientific << std::setprecision(5);
       // Print matrix column major
       for (auto i = 0; i < N; i++) {
         std::cout << "Row " << i << ":  ";
         for (auto j = 0; j < N; j++) {
-          std::cout << matrix[j*N + i] << " ";
+          std::cout << std::setw(8) << matrix[j*N + i] << " ";
         }
         std::cout << std::endl;
       }
