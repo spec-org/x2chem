@@ -5,7 +5,7 @@
 int main() {
 
     // Allocate test matrices
-    size_t nb = 4;
+    int64_t nb = 4;
     double *S    = new double[nb*nb];
     double *T    = new double[nb*nb];
     double *V    = new double[nb*nb];
@@ -20,8 +20,8 @@ int main() {
     std::complex<double> *core4C   = new std::complex<double>[4*nb*4*nb];
 
 
-    for (auto i = 0; i < 4*nb; i++)
-    for (auto j = 0; j < 4*nb; j++) {
+    for (int64_t i = 0; i < 4*nb; i++)
+    for (int64_t j = 0; j < 4*nb; j++) {
       core4C[i*4*nb + j] = std::complex<double>(0.);
     }
 

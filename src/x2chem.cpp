@@ -150,10 +150,6 @@ namespace X2Chem {
       
     std::cout.precision(11);
 
-    //const double* S = ints.S;
-    std::complex<double>* UL = output.UL;
-    std::complex<double>* US = output.US;
-    
     std::complex<double>* W = new std::complex<double>[4*nb*nb];
     std::fill_n(W,4*nb*nb,std::complex<double>(0.,1.));
 
@@ -182,8 +178,8 @@ namespace X2Chem {
     // to solve for transformation matrix K
     // T = 1C kinetic; S = 1C overlap
     // FIXME: orthonormalize T and S first, eigvals (p) should then be real
-    auto res = lapack::ggev(lapack::Job::NoVec, lapack::Job::Vec, nb, T_copy, nb, 
-                            S_copy, nb, eig, beta, SCR1, nb, K, nb);
+    lapack::ggev(lapack::Job::NoVec, lapack::Job::Vec, nb, T_copy, nb, 
+                 S_copy, nb, eig, beta, SCR1, nb, K, nb);
 
     // K^+ S K transform
     blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 

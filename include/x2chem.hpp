@@ -37,7 +37,7 @@ namespace X2Chem {
     public:
 
     LinAlgExcept(std::string function_name, int64_t exit_code) :
-      code(exit_code), name(function_name), std::runtime_error("") {
+      std::runtime_error(""), code(exit_code), name(function_name) {
       message = "Linear algebra function " + function_name
                 + " exited with code " + std::to_string(exit_code);
     }
