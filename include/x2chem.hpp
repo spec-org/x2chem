@@ -54,7 +54,7 @@ namespace X2Chem {
   //
 
   // Compute X2C Core Hamiltonian
-  void x2c_hamiltonian(const unsigned int, const Integrals&, X2COperators&, std::complex<double>*);
+  void x2c_hamiltonian(const int64_t, const Integrals&, X2COperators&, std::complex<double>*);
   
   // Boettger 2e SOC scaling factor
   void boettger_2e_soc(int64_t, std::complex<double>*, double*, int64_t*);
@@ -68,14 +68,14 @@ namespace X2Chem {
   //
 
   // Construct 4C Core Hamiltonian
-  void _build_4c_core_ham(const unsigned int, double*, std::complex<double>*, 
+  void _build_4c_core_ham(const int64_t, double*, std::complex<double>*, 
                           std::complex<double>*, std::complex<double>*);
 
   // Form spin-orbit coupling matrix (W) 
-  void _form_1e_soc_matrix(const unsigned int, std::complex<double>*, std::array<double*,4>, bool);
+  void _form_1e_soc_matrix(const int64_t, std::complex<double>*, std::array<double*,4>, bool);
 
   // Form picture change unitary matrices UL and US
-  void _form_U(const unsigned int, std::complex<double>*, std::complex<double>*,
+  void _form_U(const int64_t, std::complex<double>*, std::complex<double>*,
                double*, double*, std::complex<double>*, std::complex<double>*, 
                std::complex<double>*, std::complex<double>*);
 
@@ -87,12 +87,12 @@ namespace X2Chem {
   namespace detail {
 
     // Inverse of a matrix using LU factorization (getrf + getri)
-    void LUinv_square(int64_t, std::complex<double>*, int64_t, int64_t*);
+    void LUinv_square(const int64_t, std::complex<double>*, int64_t, int64_t*);
 
     // Set submats of larger matrix
     template <typename sourceT, typename destT>
-    void set_submat(unsigned int n, unsigned int m, const sourceT* A,
-      unsigned int LDA, destT* B, unsigned int LDB)
+    void set_submat(const int64_t n, const int64_t m, const sourceT* A,
+      const int64_t LDA, destT* B, const int64_t LDB)
     {
       for (auto i = 0; i < m; i++)
       for (auto j = 0; j < n; j++) {
@@ -102,7 +102,7 @@ namespace X2Chem {
 
     // Dev functions
     template <typename T>
-    void print_matrix(unsigned int N, const T* matrix)
+    void print_matrix(const int64_t N, const T* matrix)
     {
       // Print matrix column major
       for (auto i = 0; i < N; i++) {

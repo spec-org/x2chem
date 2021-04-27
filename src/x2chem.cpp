@@ -24,7 +24,7 @@ namespace X2Chem {
   } // namespace detail
 
 
-  void _build_4c_core_ham(const unsigned int nb, double* V, std::complex<double>* p, 
+  void _build_4c_core_ham(const int64_t nb, double* V, std::complex<double>* p, 
                           std::complex<double>* W, std::complex<double>* core4c)
   {
     // Zero out 4C Core Ham memory
@@ -59,7 +59,7 @@ namespace X2Chem {
     return;
   }
 
-  void _form_1e_soc_matrix(const unsigned int nb, std::complex<double>* W, 
+  void _form_1e_soc_matrix(const int64_t nb, std::complex<double>* W, 
                            std::array<double*,4> pVp, bool soc)
   {
     if( soc ) {
@@ -112,7 +112,7 @@ namespace X2Chem {
   } 
 
 
-  void x2c_hamiltonian(const unsigned int nb, const Integrals& ints,
+  void x2c_hamiltonian(const int64_t nb, const Integrals& ints,
     X2COperators& output, std::complex<double>* core4c)
   {
       
@@ -381,7 +381,7 @@ namespace X2Chem {
   }
   
   // Form picture change unitary matrices UL and US
-  void _form_U(const unsigned int nb, std::complex<double>* UL, std::complex<double>* US,
+  void _form_U(const int64_t nb, std::complex<double>* UL, std::complex<double>* US,
                double* K, double* SK, std::complex<double>* X, std::complex<double>* R, 
                std::complex<double>* p, std::complex<double>* SCR) 
   {
