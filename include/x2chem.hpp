@@ -57,7 +57,7 @@ namespace X2Chem {
   void x2c_hamiltonian(const unsigned int, const Integrals&, X2COperators&, std::complex<double>*);
   
   // Boettger 2e SOC scaling factor
-  void boettger_2e_soc(double*, double*);
+  void boettger_2e_soc(int64_t, std::complex<double>*, double*, int64_t*);
 
   template <typename T>
   int64_t orthonormalize(int64_t, T*, double*, double);

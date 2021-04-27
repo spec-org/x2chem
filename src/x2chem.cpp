@@ -465,8 +465,37 @@ namespace X2Chem {
   }
 
 
-  void boettger_2e_soc(double *basis, double *coreH)
+  void boettger_2e_soc(int64_t nb, std::complex<double>* coreH, double* nucList, int64_t* angList)
   {
+
+    std::complex<double> factor;
+
+    // Blocks of the X2C Core Hamiltonian
+    std::complex<double>* HAA = coreH;
+    std::complex<double>* HAB = coreH + nb;
+    std::complex<double>* HBA = coreH + nb * 2*nb;
+    std::complex<double>* HBB = coreH + nb * 2*nb + nb;
+
+    // Q factors indexed by angular momentum s, p, d...
+    std::array<double,6> Ql={0.,2.,10.,28.,60.,110.};
+ 
+    // Modify each block of the X2C Core Hamiltonian
+    for( auto i = 0; i < nb; i++ ) {
+      for( auto j = 0; j < nb; j++ ) {
+
+        // Compute factor f
+        factor = -1.0 * std::sqrt( Ql[angList[i]] * Ql[angList[j]] / nucList[i] / nucList[j]);
+        //std::cout << "factor: " << factor << "\n";
+
+        // Scale elements of each block
+        HAA[j + i*2*nb] += (factor / 2.0) * (HAA[j + i*2*nb] - HBB[j + i*2*nb]);
+        HBB[j + i*2*nb] -= (factor / 2.0) * (HAA[j + i*2*nb] - HBB[j + i*2*nb]);
+        HAB[j + i*2*nb] += factor * HAB[j + i*2*nb];
+        HBA[j + i*2*nb] += factor * HBA[j + i*2*nb];
+
+      }
+    }   
+
     return;
   }
 
