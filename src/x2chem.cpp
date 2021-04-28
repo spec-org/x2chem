@@ -181,41 +181,56 @@ namespace X2Chem {
 
 
   void x2c_hamiltonian(const int64_t nb, const Integrals& ints,
-    X2COperators& output, std::complex<double>* core4c)
+    X2COperators& output, void* scratch)
   {
       
     std::cout.precision(11);
     int64_t nbsq = nb*nb;
     
-    // core4c size 16*nbsq 
-    std::complex<double>* CSCR1 = core4c;
-    std::complex<double>* CSCR2 = core4c + 2*nb;
-    std::complex<double>* CSCR3 = core4c + 8*nbsq;
-    std::complex<double>* CSCR4 = core4c + 8*nbsq+2*nb;
+    //
+    // Aliases into the memory provided by the user
+    //
 
-    double* DSCR1 = reinterpret_cast<double*>(CSCR1);
-    double* DSCR2 = reinterpret_cast<double*>(CSCR2);
-    double* DSCR3 = reinterpret_cast<double*>(CSCR3);
-    double* DSCR4 = reinterpret_cast<double*>(CSCR4);
+    // First chunks are for things that need to last for the whole function
+    double* p = reinterpret_cast<double*>(scratch);
+    double* K = p + nb;
+    double* V_tilde = K + nbsq;
 
-    double* p = new double[nb]; // Needs space
-    double* K = new double[nbsq];  // Need space for this
-    double* V_tilde = new double[nbsq]; // Need space for this
+    // Remaining memory is for the core hamiltonian / scratch space
+    std::complex<double>* core4c = reinterpret_cast<std::complex<double>*>(V_tilde + nbsq);
 
+    // These are continguous chunks of the core hamiltonian
+    std::complex<double>* SCR1 = core4c;
+    std::complex<double>* SCR2 = SCR1 + 4*nbsq;
+    std::complex<double>* SCR3 = SCR2 + 4*nbsq;
+    std::complex<double>* SCR4 = SCR3 + 4*nbsq;
+
+    // Double alias for SCR1
+    double* DSCR1 = reinterpret_cast<double*>(SCR1);
+
+    //
+    // Other aliases
+    //
+
+    // Use US for eigenvalues and transformed integrals
+    double* eig = reinterpret_cast<double*>(output.US);
+
+    // Use UL for W
+    std::complex<double>* W = output.UL;
+
+    // Integral short names
     double* S = ints.S;
     double* T = ints.T;
     double* V = ints.V;
 
 
+    //
+    // Transform into K basis
+    //
+
+    // Eigenproblem TK = Kt to solve for transformation matrix K
+    // T = 1C kinetic
     std::copy_n(T, nbsq, K);
-
-    double* eig = reinterpret_cast<double*>(output.US);
-
-
-    // General eigen TK = SKt
-    // to solve for transformation matrix K
-    // T = 1C kinetic; S = 1C overlap
-    // FIXME: orthonormalize T and S first, eigvals (p) should then be real
     lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, nb, K, nb, eig);
 
     detail::print_matrix(nb, K);
@@ -255,12 +270,14 @@ namespace X2Chem {
       }
     }
 
-    std::complex<double>* W = output.UL;
-    int64_t LDW = 2*nb;
+    //
+    // Form 4c hamiltonian and diagonalize
+    //
+
     // Form full spin-orbit coupling matrix W
+    int64_t LDW = 2*nb;
     _form_1e_soc_matrix(nb, W, LDW, ints.pVp, true);
     detail::print_matrix(4*nb, core4c);
-
 
     // Subtract out 2mc^2 from W diagonals
     const double Wscale = 2. * LIGHTSPEED * LIGHTSPEED;
@@ -284,9 +301,15 @@ namespace X2Chem {
     for (auto i = 0; i < 2*nb; i++) std::cout << i << ": " << core4c[i + (2*nb)*4*nb] << " ";
     std::cout << std::endl;
 
+    //
+    // Compute X2C transformations
+    //
+
     // Get large and small components of the eigenvectors
-    std::complex<double>* large = CSCR3;
-    std::complex<double>* small = CSCR4;
+    // [ _ L ]
+    // [ _ S ]
+    std::complex<double>* large = core4c + 8*nbsq;
+    std::complex<double>* small = core4c + 8*nbsq+2*nb;
 
     std::cout << "MOVEC" << std::endl;
     for (auto i = 0; i < 4*nb; i++) std::cout << i << ": " << large[i] << " ";
@@ -295,12 +318,6 @@ namespace X2Chem {
 
     // Compute inverse of large -> large^-1
     detail::LUinv_square(2*nb, large, 4*nb, reinterpret_cast<int64_t*>(eig));
-
-    // New pointers FIXME: messy
-    std::complex<double>* SCR1 = CSCR1;
-    std::complex<double>* SCR2 = SCR1 + 4*nbsq;
-    std::complex<double>* SCR3 = SCR2 + 4*nbsq;
-    std::complex<double>* SCR4 = SCR3 + 4*nbsq;
 
     // X = small * large^-1
     std::complex<double>* X = SCR2;
@@ -341,7 +358,10 @@ namespace X2Chem {
 
 
 
+    //
     // Construct 2C CH
+    //
+
     // 2C CH = R * (V' + cp * X + X^+ * cp + X^+ * W' * X) * R
 
     std::fill_n(output.coreH,4*nbsq,std::complex<double>(0.));

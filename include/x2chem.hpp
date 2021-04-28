@@ -55,7 +55,7 @@ namespace X2Chem {
   //
 
   // Compute X2C Core Hamiltonian
-  void x2c_hamiltonian(const int64_t, const Integrals&, X2COperators&, std::complex<double>*);
+  void x2c_hamiltonian(const int64_t, const Integrals&, X2COperators&, void*);
   
   // Boettger 2e SOC scaling factor
   void boettger_2e_soc(int64_t, std::complex<double>*, double*, int64_t*);
@@ -69,8 +69,7 @@ namespace X2Chem {
   //
 
   // Construct 4C Core Hamiltonian
-  void _build_4c_core_ham(const int64_t, double*, double*, 
-                          std::complex<double>*, std::complex<double>*);
+  void _build_4c_core_ham(const int64_t, double*, double*, std::complex<double>*, std::complex<double>*); 
 
   // Form spin-orbit coupling matrix (W) 
   void _form_1e_soc_matrix(const int64_t, std::complex<double>*, int64_t, std::array<double*,4>, bool);

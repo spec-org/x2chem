@@ -19,7 +19,7 @@ int main() {
     std::complex<double> *UL        = new std::complex<double>[2*nb*2*nb];
     std::complex<double> *US        = new std::complex<double>[2*nb*2*nb];
     std::complex<double> *coreX2C  = new std::complex<double>[2*nb*2*nb];
-    std::complex<double> *core4C   = new std::complex<double>[4*nb*4*nb];
+    std::complex<double> *core4C   = new std::complex<double>[4*nb*4*nb+2*nb*nb+nb];
 
     double* SCR1 = new double[nb*nb];
     double* SCR2 = new double[nb*nb];

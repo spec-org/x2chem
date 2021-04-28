@@ -28,14 +28,14 @@ TEST( X2C_Hamiltonian, UH_91Plus ) {
   std::vector<double> pvxp_x(nbsq, 0.);
 
   std::array<double*,4> pVp =
-    {pvdp.data(), pvxp_z.data(), pvxp_y.data(), pvxp_x.data()};
+    {pvdp.data(), pvxp_x.data(), pvxp_y.data(), pvxp_z.data()};
 
 
   std::vector<std::complex<double>> UL(4*nbsq, 0.);
   std::vector<std::complex<double>> US(4*nbsq, 0.);
   std::vector<std::complex<double>> coreX2C(4*nbsq, 0.);
 
-  std::vector<std::complex<double>> SCR(16*nbsq, 0.);
+  std::vector<std::complex<double>> SCR(18*nbsq+nb, 0.);
 
   //
   // Insert integral elements
