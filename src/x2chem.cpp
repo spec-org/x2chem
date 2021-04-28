@@ -4,6 +4,18 @@
 #include <blas.hh>
 #include <x2chem.hpp>
 
+
+#ifdef X2CHEM_DEBUG_PRINT
+  #define x2chem_dbgout(name, size, location) \
+    std::cout << "-----------------------------------------" << std::endl; \
+    std::cout << name << std::endl; \
+    detail::print_matrix(size, location); \
+    std::cout << "-----------------------------------------" << std::endl;
+#else
+  #define x2chem_dbgout(name, size, location)
+#endif
+
+
 namespace X2Chem {
 
   namespace detail {
@@ -62,10 +74,6 @@ namespace X2Chem {
       std::fill_n(core4c + 8*nb*nb + 4*nb*i, 2*nb, 0.);
 
     // Set proper matrices to subblocks of 4C Hamiltonian
-    //
-    std::cout << "Oh hey MARK" << std::endl;
-    detail::print_matrix(4*nb, core4c);
-    std::cout << "i did not hit her i did not" << std::endl;
     
     // Transformed 1C potential V 
     detail::set_submat(nb, nb, V, nb, core4c, 4*nb);
@@ -169,14 +177,6 @@ namespace X2Chem {
     
     }
 
-    for(auto i = 0; i < 2*nb; i++) {
-      for(auto j = 0; j < 2*nb; j++) {
-        std::cout << "W " << i << "," << j << " : " << W[i + j*LDW] << std::endl;
-      }
-    }
-
-      
-    return;
   } 
 
 
@@ -233,10 +233,7 @@ namespace X2Chem {
     std::copy_n(T, nbsq, K);
     lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, nb, K, nb, eig);
 
-    detail::print_matrix(nb, K);
-
-    for( auto i = 0; i < nb; i++ )
-      std::cout << "T eig " << i << ": "<< eig[i] << std::endl;
+    x2chem_dbgout("K Matrix", nb, K);
 
     // p^-1 = 1 / sqrt(2 * t) 
     for (auto i = 0; i < nb; i++) p[i] = 1. / std::sqrt( 2. * eig[i] );
@@ -277,7 +274,7 @@ namespace X2Chem {
     // Form full spin-orbit coupling matrix W
     int64_t LDW = 2*nb;
     _form_1e_soc_matrix(nb, W, LDW, ints.pVp, true);
-    detail::print_matrix(4*nb, core4c);
+    x2chem_dbgout("W Matrix", 2*nb, W);
 
     // Subtract out 2mc^2 from W diagonals
     const double Wscale = 2. * LIGHTSPEED * LIGHTSPEED;
@@ -288,18 +285,11 @@ namespace X2Chem {
 
     // Build 4C Core Hamiltonian
     _build_4c_core_ham(nb, V_tilde, p, W, core4c);
-    std::cout << "4C" << std::endl;
-    detail::print_matrix(4*nb, core4c);
+    x2chem_dbgout("4C Core", 4*nb, core4c);
 
     // Diagonalize 4C Core Hamiltonian
     lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 4*nb, core4c, 4*nb, eig);
-
-    std::cout << "4C Diag" << std::endl;
-    detail::print_matrix(4*nb, core4c);
-    for (auto i = 0; i < 4*nb; i++) std::cout << "eig " << i << ": " << eig[i] << std::endl;
-    std::cout << "MOVEC" << std::endl;
-    for (auto i = 0; i < 2*nb; i++) std::cout << i << ": " << core4c[i + (2*nb)*4*nb] << " ";
-    std::cout << std::endl;
+    x2chem_dbgout("4C Diag", 4*nb, core4c);
 
     //
     // Compute X2C transformations
@@ -310,11 +300,6 @@ namespace X2Chem {
     // [ _ S ]
     std::complex<double>* large = core4c + 8*nbsq;
     std::complex<double>* small = core4c + 8*nbsq+2*nb;
-
-    std::cout << "MOVEC" << std::endl;
-    for (auto i = 0; i < 4*nb; i++) std::cout << i << ": " << large[i] << " ";
-    std::cout << std::endl;
-
 
     // Compute inverse of large -> large^-1
     detail::LUinv_square(2*nb, large, 4*nb, reinterpret_cast<int64_t*>(eig));
@@ -339,10 +324,6 @@ namespace X2Chem {
     // Diagonalize R: R -> V * r * V^+
     lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 2*nb, R, 2*nb, eig);
 
-    std::cout << std::setprecision(10) << std::endl;
-    for(auto i = 0; i < 2*nb; i++ )
-      std::cout << "R eig " << i << ": " << eig[i] << std::endl;
-
     // CSCR -> V * r^-0.25
     for(auto i = 0; i < 2*nb; i++)
     for(auto j = 0; j < 2*nb; j++)
@@ -352,9 +333,7 @@ namespace X2Chem {
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::ConjTrans, 
                  2*nb, 2*nb, 2*nb, 1.0, SCR1, 2*nb, SCR1, 2*nb, 0.0, R, 2*nb);
 
-    
-    std::cout << "R" << std::endl;
-    detail::print_matrix(2*nb, R);
+    x2chem_dbgout("R", 2*nb, R);
 
 
 
@@ -399,17 +378,12 @@ namespace X2Chem {
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
                  2*nb, 2*nb, 2*nb, 1.0, R, 2*nb, SCR1, 2*nb, 0.0, output.coreH, 2*nb);
 
+    x2chem_dbgout("2C Core in K basis", 2*nb, output.coreH);
 
-    std::complex<double>* extraScr = new std::complex<double>[4*nb*nb];
-    double* moreEig = new double[2*nb];
-    std::copy_n(output.coreH, 4*nb*nb, extraScr);
-    lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 2*nb, extraScr, 2*nb, moreEig);
-
-    std::cout << std::setprecision(10) << std::endl;
-    for( auto i = 0; i < 2*nb; i++ )
-      std::cout << "Eig " << i << ": " << moreEig[i] << std::endl;
- 
+    //
     // Back Transform 2C CH
+    //
+
     // K^-1 = K\dag
 
     // Transform 2C CH by block
@@ -423,15 +397,13 @@ namespace X2Chem {
     // Bottom-right
     detail::transform(nb, output.coreH + 2*nb*nb + nb, 2*nb, K, nb, SCR1, nb, output.coreH + 2*nbsq + nb, 2*nb, false);
 
-    std::copy_n(output.coreH, 4*nb*nb, extraScr);
-    lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 2*nb, extraScr, 2*nb, moreEig);
+    x2chem_dbgout("2C Core in ortho basis", 2*nb, output.coreH);
 
-    std::cout << std::setprecision(10) << std::endl;
-    for( auto i = 0; i < 2*nb; i++ )
-      std::cout << "Eig " << i << ": " << moreEig[i] << std::endl;
- 
 
+    //
     // Form U_X2C for picture change
+    //
+
     _form_U(nb, output.UL, output.US, K, X, R, p, SCR1); 
 
   }
@@ -459,8 +431,8 @@ namespace X2Chem {
     // X*R -> R
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
                2*nb, 2*nb, 2*nb, 1.0, X, 2*nb, R, 2*nb, 0.0, R, 2*nb);
-    std::cout << "R" << std::endl;
-    detail::print_matrix(2*nb, R);
+
+    x2chem_dbgout("X*R", 2*nb, R);
 
     // R = 2 * c * p^-1 * R  
     for(auto i = 0; i < 2*nb; i++)
@@ -521,7 +493,6 @@ namespace X2Chem {
 
         // Compute factor f
         factor = -1.0 * std::sqrt( Ql[angList[j]] * Ql[angList[i]] / nucList[j] / nucList[i]);
-        std::cout << "factor: " << factor << "\n";
 
         // Scale elements of each block
         on_diag = (factor / 2.0) * (HAA[j + i*2*nb] - HBB[j + i*2*nb]);
