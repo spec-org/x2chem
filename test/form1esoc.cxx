@@ -73,12 +73,12 @@ TEST( Form1eSOC, dense_W ) {
     }
   }
 
-  free(pVp[0]);
-  free(pVp[1]);
-  free(pVp[2]);
-  free(pVp[3]);
-  free(computed_W);
-  free(expected);
+  delete[] pVp[0];
+  delete[] pVp[1];
+  delete[] pVp[2];
+  delete[] pVp[3];
+  delete[] computed_W;
+  delete[] expected;
 }
 
 TEST( Form1eSOC, dense_W_noSOC ) {
@@ -149,12 +149,12 @@ TEST( Form1eSOC, dense_W_noSOC ) {
     }
   }
 
-  free(pVp[0]);
-  free(pVp[1]);
-  free(pVp[2]);
-  free(pVp[3]);
-  free(computed_W);
-  free(expected);
+  delete[] pVp[0];
+  delete[] pVp[1];
+  delete[] pVp[2];
+  delete[] pVp[3];
+  delete[] computed_W;
+  delete[] expected;
 }
 
 

@@ -145,9 +145,9 @@ TEST( Boettger, UH_91p ) {
     }
   }
 
-  free(nucList);
-  free(angList);
-  free(core_test);
-  free(expected);
+  delete[] nucList;
+  delete[] angList;
+  delete[] core_test;
+  delete[] expected;
 }
 
