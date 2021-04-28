@@ -20,32 +20,65 @@ namespace X2Chem {
 
   namespace detail {
 
+    /**
+     * @brief Transforms the matrix A using the transform U and stores it in B
+     *
+     * Transforms a matrix from its original basis to a new basis using the
+     * provided transformation matrix. Specifically, it has two variants,
+     *
+     * Forward:
+     * \f[
+     *   B := U^\dag A U
+     * \f]
+     *
+     * and Backward:
+     * \f[
+     *   B := U A U^\dag
+     * ]\f
+     *
+     * @param      n        Length of original basis
+     * @param      m        Length of transformed basis
+     * @param[in]  A        Square matrix to be transformed (n x n)
+     * @param      LDA      Leading dimension of A (at least n)
+     * @param[in]  U        Transformation matrix
+     *                      - If forward, dimension of U is (n x m)
+     *                      - If backward, dimension of U is (m x n)
+     * @param      LDU      Leading dimension of U
+     *                      - If forward, at least n
+     *                      - If backward, at least m
+     * @param[in]  SCR      Intermediate matrix (n x m)
+     * @param      LDS      Leading dimension of SCR (at least n)
+     * @param[out] B        Output matrix for transform (m x m)
+     * @param      LDB      Leading dimension of B (at least m)
+     * @param      forward  Whether to to do the forward or backward transform
+     **/
     template <typename OpT, typename TransT>
-    void transform(int64_t n, OpT* A, int64_t LDA, TransT* U, int64_t LDU,
-      OpT* SCR, int64_t LDS, OpT* B, int64_t LDB, bool forward)
+    void transform(int64_t n, int64_t m, OpT* A, int64_t LDA, TransT* U,
+      int64_t LDU, OpT* SCR, int64_t LDS, OpT* B, int64_t LDB, bool forward)
     {
 
       blas::Op first = forward ? blas::Op::NoTrans : blas::Op::ConjTrans;
       blas::Op second = forward ? blas::Op::ConjTrans : blas::Op::NoTrans;
 
       blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, first, 
-                 n, n, n, 1.0, A, LDA, U, LDU, 0.0, SCR, LDS);
+                 n, m, n, 1.0, A, LDA, U, LDU, 0.0, SCR, LDS);
 
       blas::gemm(blas::Layout::ColMajor, second, blas::Op::NoTrans, 
-                 n, n, n, 1.0, U, LDU, SCR, LDS, 0.0, B, LDB);
+                 m, m, n, 1.0, U, LDU, SCR, LDS, 0.0, B, LDB);
 
     }
 
-    template void transform<double,double>(int64_t, double*, int64_t, double*,
-        int64_t, double*, int64_t, double*, int64_t, bool);
+    template void transform<double,double>(int64_t, int64_t, double*, int64_t,
+        double*, int64_t, double*, int64_t, double*, int64_t, bool);
 
-    template void transform<std::complex<double>,double>(int64_t,
+    template void transform<std::complex<double>,double>(int64_t, int64_t,
         std::complex<double>*, int64_t, double*, int64_t,
         std::complex<double>*, int64_t, std::complex<double>*, int64_t, bool);
 
     template void transform<std::complex<double>,std::complex<double>>(int64_t,
-        std::complex<double>*, int64_t, std::complex<double>*, int64_t,
-        std::complex<double>*, int64_t, std::complex<double>*, int64_t, bool);
+        int64_t, std::complex<double>*, int64_t, std::complex<double>*,
+        int64_t, std::complex<double>*, int64_t, std::complex<double>*,
+        int64_t, bool);
 
 
     void LUinv_square(int64_t n, std::complex<double>* A, int64_t lda, int64_t* ipiv)
@@ -387,13 +420,13 @@ namespace X2Chem {
     // Transform 2C CH by block
     // K H K\dag
     // Top-left
-    detail::transform(nb, output.coreH, 2*nb, K, nb, SCR1, nb, output.coreH, 2*nb, false);
+    detail::transform(nb, nb, output.coreH, 2*nb, K, nb, SCR1, nb, output.coreH, 2*nb, false);
     // Bottom-left
-    detail::transform(nb, output.coreH + nb, 2*nb, K, nb, SCR1, nb, output.coreH + nb, 2*nb, false);
+    detail::transform(nb, nb, output.coreH + nb, 2*nb, K, nb, SCR1, nb, output.coreH + nb, 2*nb, false);
     // Top-right
-    detail::transform(nb, output.coreH + 2*nb*nb, 2*nb, K, nb, SCR1, nb, output.coreH + 2*nbsq, 2*nb, false);
+    detail::transform(nb, nb, output.coreH + 2*nb*nb, 2*nb, K, nb, SCR1, nb, output.coreH + 2*nbsq, 2*nb, false);
     // Bottom-right
-    detail::transform(nb, output.coreH + 2*nb*nb + nb, 2*nb, K, nb, SCR1, nb, output.coreH + 2*nbsq + nb, 2*nb, false);
+    detail::transform(nb, nb, output.coreH + 2*nb*nb + nb, 2*nb, K, nb, SCR1, nb, output.coreH + 2*nbsq + nb, 2*nb, false);
 
     x2chem_dbgout("2C Core in ortho basis", 2*nb, output.coreH);
 
@@ -414,13 +447,13 @@ namespace X2Chem {
 
     // Form UL = K * R * K^-1
     // Top-left
-    detail::transform(nb, R, 2*nb, K, nb, SCR, nb, UL, 2*nb, false);
+    detail::transform(nb, nb, R, 2*nb, K, nb, SCR, nb, UL, 2*nb, false);
     // Bottom-left
-    detail::transform(nb, R + nb, 2*nb, K, nb, SCR, nb, UL + nb, 2*nb, false);
+    detail::transform(nb, nb, R + nb, 2*nb, K, nb, SCR, nb, UL + nb, 2*nb, false);
     // Top-right
-    detail::transform(nb, R + 2*nb*nb, 2*nb, K, nb, SCR, nb, UL + 2*nb*nb, 2*nb, false);
+    detail::transform(nb, nb, R + 2*nb*nb, 2*nb, K, nb, SCR, nb, UL + 2*nb*nb, 2*nb, false);
     // Bottom-right
-    detail::transform(nb, R + 2*nb*nb + nb, 2*nb, K, nb, SCR, nb, UL + 2*nb*nb + nb, 2*nb, false);
+    detail::transform(nb, nb, R + 2*nb*nb + nb, 2*nb, K, nb, SCR, nb, UL + 2*nb*nb + nb, 2*nb, false);
 
 
     // Form US = K * 2cp^-1 * X * R * K^-1
@@ -442,13 +475,13 @@ namespace X2Chem {
     // Transform K * R * K^-1
     // where R = 2 * c * p^-1 * R * X
     // Top-left
-    detail::transform(nb, R, 2*nb, K, nb, SCR, nb, US, 2*nb, false);
+    detail::transform(nb, nb, R, 2*nb, K, nb, SCR, nb, US, 2*nb, false);
     // Bottom-left
-    detail::transform(nb, R + nb, 2*nb, K, nb, SCR, nb, US + nb, 2*nb, false);
+    detail::transform(nb, nb, R + nb, 2*nb, K, nb, SCR, nb, US + nb, 2*nb, false);
     // Top-right
-    detail::transform(nb, R + 2*nb*nb, 2*nb, K, nb, SCR, nb, US + 2*nb*nb, 2*nb, false);
+    detail::transform(nb, nb, R + 2*nb*nb, 2*nb, K, nb, SCR, nb, US + 2*nb*nb, 2*nb, false);
     // Bottom-right
-    detail::transform(nb, R + 2*nb*nb + nb, 2*nb, K, nb, SCR, nb, US + 2*nb*nb + nb, 2*nb, false);
+    detail::transform(nb, nb, R + 2*nb*nb + nb, 2*nb, K, nb, SCR, nb, US + 2*nb*nb + nb, 2*nb, false);
 
   }
 

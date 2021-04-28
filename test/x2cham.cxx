@@ -96,12 +96,12 @@ TEST( X2C_Hamiltonian, UH_91Plus ) {
   orthonormalize(nb, SCR1, SCR2, 1e-12);
 
   // Transform all integrals in place
-  detail::transform(nb, T.data(), nb, SCR1, nb, SCR2, nb, T.data(), nb, true);
-  detail::transform(nb, V.data(), nb, SCR1, nb, SCR2, nb, V.data(), nb, true);
-  detail::transform(nb, pVp[0], nb, SCR1, nb, SCR2, nb, pVp[0], nb, true);
-  detail::transform(nb, pVp[1], nb, SCR1, nb, SCR2, nb, pVp[1], nb, true);
-  detail::transform(nb, pVp[2], nb, SCR1, nb, SCR2, nb, pVp[2], nb, true);
-  detail::transform(nb, pVp[3], nb, SCR1, nb, SCR2, nb, pVp[3], nb, true);
+  detail::transform(nb, nb, T.data(), nb, SCR1, nb, SCR2, nb, T.data(), nb, true);
+  detail::transform(nb, nb, V.data(), nb, SCR1, nb, SCR2, nb, V.data(), nb, true);
+  detail::transform(nb, nb, pVp[0], nb, SCR1, nb, SCR2, nb, pVp[0], nb, true);
+  detail::transform(nb, nb, pVp[1], nb, SCR1, nb, SCR2, nb, pVp[1], nb, true);
+  detail::transform(nb, nb, pVp[2], nb, SCR1, nb, SCR2, nb, pVp[2], nb, true);
+  detail::transform(nb, nb, pVp[3], nb, SCR1, nb, SCR2, nb, pVp[3], nb, true);
 
   //
   // Do main work

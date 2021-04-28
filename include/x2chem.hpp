@@ -90,8 +90,8 @@ namespace X2Chem {
     void LUinv_square(const int64_t, std::complex<double>*, int64_t, int64_t*);
 
     template <typename OpT, typename TransT>
-    void transform(int64_t n, OpT* A, int64_t LDA, TransT* U, int64_t LDU,
-      OpT* SCR, int64_t LDS, OpT* B, int64_t LDB, bool forward);
+    void transform(int64_t n, int64_t m, OpT* A, int64_t LDA, TransT* U,
+      int64_t LDU, OpT* SCR, int64_t LDS, OpT* B, int64_t LDB, bool forward);
 
     // Set submats of larger matrix
     template <typename sourceT, typename destT>
