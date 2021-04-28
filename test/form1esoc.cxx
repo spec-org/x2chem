@@ -60,7 +60,8 @@ TEST( Form1eSOC, dense_W ) {
   expected[15] = std::complex<double>(1.0,-4.0);
 
   // Form test W
-  _form_1e_soc_matrix(nb, computed_W, pVp, true);
+  int64_t LDW = 2*nb;
+  _form_1e_soc_matrix(nb, computed_W, LDW, pVp, true);
 
   // Compare SOC matrices
   for( auto i = 0; i < 2*nb; i++ ) {
@@ -135,7 +136,8 @@ TEST( Form1eSOC, dense_W_noSOC ) {
   expected[15] = std::complex<double>(1.0);
 
   // Form test W
-  _form_1e_soc_matrix(nb, computed_W, pVp, false);
+  int64_t LDW = 2*nb;
+  _form_1e_soc_matrix(nb, computed_W, LDW, pVp, false);
 
   // Compare SOC matrices
   for( auto i = 0; i < 2*nb; i++ ) {

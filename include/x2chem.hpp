@@ -69,16 +69,16 @@ namespace X2Chem {
   //
 
   // Construct 4C Core Hamiltonian
-  void _build_4c_core_ham(const int64_t, double*, std::complex<double>*, 
+  void _build_4c_core_ham(const int64_t, double*, double*, 
                           std::complex<double>*, std::complex<double>*);
 
   // Form spin-orbit coupling matrix (W) 
-  void _form_1e_soc_matrix(const int64_t, std::complex<double>*, std::array<double*,4>, bool);
+  void _form_1e_soc_matrix(const int64_t, std::complex<double>*, int64_t, std::array<double*,4>, bool);
 
   // Form picture change unitary matrices UL and US
   void _form_U(const int64_t, std::complex<double>*, std::complex<double>*,
-               double*, double*, std::complex<double>*, std::complex<double>*, 
-               std::complex<double>*, std::complex<double>*);
+               double*, std::complex<double>*, std::complex<double>*, 
+               double*, std::complex<double>*);
 
 
   //
@@ -89,6 +89,10 @@ namespace X2Chem {
 
     // Inverse of a matrix using LU factorization (getrf + getri)
     void LUinv_square(const int64_t, std::complex<double>*, int64_t, int64_t*);
+
+    template <typename OpT, typename TransT>
+    void transform(int64_t n, OpT* A, int64_t LDA, TransT* U, int64_t LDU,
+      OpT* SCR, int64_t LDS, OpT* B, int64_t LDB, bool forward);
 
     // Set submats of larger matrix
     template <typename sourceT, typename destT>

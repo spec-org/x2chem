@@ -8,6 +8,34 @@ namespace X2Chem {
 
   namespace detail {
 
+    template <typename OpT, typename TransT>
+    void transform(int64_t n, OpT* A, int64_t LDA, TransT* U, int64_t LDU,
+      OpT* SCR, int64_t LDS, OpT* B, int64_t LDB, bool forward)
+    {
+
+      blas::Op first = forward ? blas::Op::NoTrans : blas::Op::ConjTrans;
+      blas::Op second = forward ? blas::Op::ConjTrans : blas::Op::NoTrans;
+
+      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, first, 
+                 n, n, n, 1.0, A, LDA, U, LDU, 0.0, SCR, LDS);
+
+      blas::gemm(blas::Layout::ColMajor, second, blas::Op::NoTrans, 
+                 n, n, n, 1.0, U, LDU, SCR, LDS, 0.0, B, LDB);
+
+    }
+
+    template void transform<double,double>(int64_t, double*, int64_t, double*,
+        int64_t, double*, int64_t, double*, int64_t, bool);
+
+    template void transform<std::complex<double>,double>(int64_t,
+        std::complex<double>*, int64_t, double*, int64_t,
+        std::complex<double>*, int64_t, std::complex<double>*, int64_t, bool);
+
+    template void transform<std::complex<double>,std::complex<double>>(int64_t,
+        std::complex<double>*, int64_t, std::complex<double>*, int64_t,
+        std::complex<double>*, int64_t, std::complex<double>*, int64_t, bool);
+
+
     void LUinv_square(int64_t n, std::complex<double>* A, int64_t lda, int64_t* ipiv)
     {
 
@@ -24,14 +52,20 @@ namespace X2Chem {
   } // namespace detail
 
 
-  void _build_4c_core_ham(const int64_t nb, double* V, std::complex<double>* p, 
+  void _build_4c_core_ham(const int64_t nb, double* V, double* p, 
                           std::complex<double>* W, std::complex<double>* core4c)
   {
-    // Zero out 4C Core Ham memory
-    std::fill_n(core4c,16*nb*nb,std::complex<double>(0.));
 
+    // Zero out 4C Core Ham memory
+    std::fill_n(core4c,8*nb*nb,std::complex<double>(0.));
+    for( auto i = 0; i < 2*nb; i++ )
+      std::fill_n(core4c + 8*nb*nb + 4*nb*i, 2*nb, 0.);
 
     // Set proper matrices to subblocks of 4C Hamiltonian
+    //
+    std::cout << "Oh hey MARK" << std::endl;
+    detail::print_matrix(4*nb, core4c);
+    std::cout << "i did not hit her i did not" << std::endl;
     
     // Transformed 1C potential V 
     detail::set_submat(nb, nb, V, nb, core4c, 4*nb);
@@ -52,11 +86,6 @@ namespace X2Chem {
 
     // Spin orbit matrix W
     detail::set_submat(2*nb, 2*nb, W, 2*nb, core4c + 2*nb + (4*nb * 2*nb) , 4*nb);
-
-    //std::cout << "4CCH" << "\n";
-    //_print_matrix(4*nb, core4c); 
-
-    return;
   }
 
 
@@ -85,7 +114,7 @@ namespace X2Chem {
    *                        without SOC.
    *
    **/
-  void _form_1e_soc_matrix(const int64_t nb, std::complex<double>* W, 
+  void _form_1e_soc_matrix(const int64_t nb, std::complex<double>* W, int64_t LDW,
                            std::array<double*,4> pVp, bool soc)
   {
     if( soc ) {
@@ -93,7 +122,7 @@ namespace X2Chem {
       // W = [ W1  W2 ]
       //     [ W3  W4 ]
       std::complex<double> *W1 = W;
-      std::complex<double> *W2 = W1 + 2*nb*nb;
+      std::complex<double> *W2 = W1 + nb*LDW;
       std::complex<double> *W3 = W1 + nb;
       std::complex<double> *W4 = W2 + nb;
 
@@ -101,16 +130,16 @@ namespace X2Chem {
         for(auto j = 0; j < nb; j++) {
 
           // W1 = pV.p + i (pVxp)(Z)
-          W1[j + i*2*nb] =  pVp[0][j + i*nb] + std::complex<double>(0.,1.) * pVp[3][j + i*nb];
+          W1[j + i*LDW] =  pVp[0][j + i*nb] + std::complex<double>(0.,1.) * pVp[3][j + i*nb];
 
           // W2 = (pVxp)(Y) + i (pVxp)(X)
-          W2[j + i*2*nb] =  pVp[2][j + i*nb] + std::complex<double>(0.,1.) * pVp[1][j + i*nb];
+          W2[j + i*LDW] =  pVp[2][j + i*nb] + std::complex<double>(0.,1.) * pVp[1][j + i*nb];
 
           // W3 = -(pVxp)(Y) + i (pVxp)(X)
-          W3[j + i*2*nb] = -pVp[2][j + i*nb] + std::complex<double>(0.,1.) * pVp[1][j + i*nb];
+          W3[j + i*LDW] = -pVp[2][j + i*nb] + std::complex<double>(0.,1.) * pVp[1][j + i*nb];
 
           // W4 = pV.p - i (pVxp)(Z)
-          W4[j + i*2*nb] =  pVp[0][j + i*nb] - std::complex<double>(0.,1.) * pVp[3][j + i*nb];
+          W4[j + i*LDW] =  pVp[0][j + i*nb] - std::complex<double>(0.,1.) * pVp[3][j + i*nb];
         }
       }
 
@@ -119,7 +148,7 @@ namespace X2Chem {
       // W = [ W1  0  ]
       //     [ 0   W4 ]
       std::complex<double> *W1 = W;
-      std::complex<double> *W2 = W1 + 2*nb*nb;
+      std::complex<double> *W2 = W1 + nb*LDW;
       std::complex<double> *W3 = W1 + nb;
       std::complex<double> *W4 = W2 + nb;
 
@@ -127,18 +156,25 @@ namespace X2Chem {
         for(auto j = 0; j < nb; j++) {
 
           // W1 = pV.p 
-          W1[j + i*2*nb] = pVp[0][j + i*nb];
+          W1[j + i*LDW] = pVp[0][j + i*nb];
 
           // W4 = pV.p
-          W4[j + i*2*nb] = pVp[0][j + i*nb];
+          W4[j + i*LDW] = pVp[0][j + i*nb];
 
           // Zero out W2 and W3 blocks
-          W2[j + i*2*nb] = 0.0;
-          W3[j + i*2*nb] = 0.0;
+          W2[j + i*LDW] = 0.0;
+          W3[j + i*LDW] = 0.0;
         }
       }
     
     }
+
+    for(auto i = 0; i < 2*nb; i++) {
+      for(auto j = 0; j < 2*nb; j++) {
+        std::cout << "W " << i << "," << j << " : " << W[i + j*LDW] << std::endl;
+      }
+    }
+
       
     return;
   } 
@@ -149,96 +185,86 @@ namespace X2Chem {
   {
       
     std::cout.precision(11);
+    int64_t nbsq = nb*nb;
+    
+    // core4c size 16*nbsq 
+    std::complex<double>* CSCR1 = core4c;
+    std::complex<double>* CSCR2 = core4c + 2*nb;
+    std::complex<double>* CSCR3 = core4c + 8*nbsq;
+    std::complex<double>* CSCR4 = core4c + 8*nbsq+2*nb;
 
-    std::complex<double>* W = new std::complex<double>[4*nb*nb];
-    std::fill_n(W,4*nb*nb,std::complex<double>(0.,1.));
+    double* DSCR1 = reinterpret_cast<double*>(CSCR1);
+    double* DSCR2 = reinterpret_cast<double*>(CSCR2);
+    double* DSCR3 = reinterpret_cast<double*>(CSCR3);
+    double* DSCR4 = reinterpret_cast<double*>(CSCR4);
 
-    double* K = new double[nb*nb];
-    double* SCR1 = new double[nb*nb];
-    double* SCR2 = new double[nb*nb];
-    std::complex<double>* CSCR = new std::complex<double>[4*nb*nb];
-    std::complex<double>* X = new std::complex<double>[4*nb*nb];
-    std::complex<double>* R = new std::complex<double>[4*nb*nb];
-    std::complex<double>* eig = new std::complex<double>[nb];
-    double* beta = new double[4*nb];
-    int64_t* ipiv = new int64_t[2*nb];
-    std::complex<double>* p = new std::complex<double>[nb];
+    double* p = new double[nb]; // Needs space
+    double* K = new double[nbsq];  // Need space for this
+    double* V_tilde = new double[nbsq]; // Need space for this
+
     double* S = ints.S;
     double* T = ints.T;
     double* V = ints.V;
-    double* T_copy = new double[nb*nb]; 
-    double* S_copy = new double[nb*nb]; 
-    double* V_tilde = new double[nb*nb]; 
-    std::copy_n(S, nb*nb, S_copy);
-    std::copy_n(T, nb*nb, T_copy);
 
+
+    std::copy_n(T, nbsq, K);
+
+    double* eig = reinterpret_cast<double*>(output.US);
 
 
     // General eigen TK = SKt
     // to solve for transformation matrix K
     // T = 1C kinetic; S = 1C overlap
     // FIXME: orthonormalize T and S first, eigvals (p) should then be real
-    lapack::ggev(lapack::Job::NoVec, lapack::Job::Vec, nb, T_copy, nb, 
-                 S_copy, nb, eig, beta, SCR1, nb, K, nb);
+    lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, nb, K, nb, eig);
 
-    // K^+ S K transform
-    blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, K, nb, S, nb, 0.0, SCR1, nb);
+    detail::print_matrix(nb, K);
 
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, SCR1, nb, K, nb, 0.0, SCR2, nb);
+    for( auto i = 0; i < nb; i++ )
+      std::cout << "T eig " << i << ": "<< eig[i] << std::endl;
 
-    std::cout << "SCR2" << std::endl;
-    detail::print_matrix(nb, SCR2);
+    // p^-1 = 1 / sqrt(2 * t) 
+    for (auto i = 0; i < nb; i++) p[i] = 1. / std::sqrt( 2. * eig[i] );
 
-    // Scale K by 1 / sqrt(diag( K^+ S K ))
-    for (auto i = 0; i < nb; i++) 
-    for (auto j = 0; j < nb; j++) 
-      K[j + nb*i] /= std::sqrt(SCR2[i + i*nb]);
 
     // Transform non-rel potential V -> V_tilde
     // K^+ V K
     blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, K, nb, V, nb, 0.0, SCR1, nb);
+               nb, nb, nb, 1.0, K, nb, V, nb, 0.0, DSCR1, nb);
 
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, SCR1, nb, K, nb, 0.0, V_tilde, nb);
-
-    std::cout << "V_tilde" << std::endl;
-    detail::print_matrix(nb, V_tilde);
+               nb, nb, nb, 1.0, DSCR1, nb, K, nb, 0.0, V_tilde, nb);
 
     // Transform pV.p and pVxp integrals
     // K^+ w K
     for(auto mat = 0; mat < 4; mat++) {
       blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
-                 nb, nb, nb, 1.0, K, nb, ints.pVp[mat], nb, 0.0, SCR1, nb);
+                 nb, nb, nb, 1.0, K, nb, ints.pVp[mat], nb, 0.0, DSCR1, nb);
 
       blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-                 nb, nb, nb, 1.0, SCR1, nb, K, nb, 0.0, ints.pVp[mat], nb);
+                 nb, nb, nb, 1.0, DSCR1, nb, K, nb, 0.0, ints.pVp[mat], nb);
     }
-
-    // p^-1 = 1 / sqrt(2 * t) 
-    for (auto i = 0; i < nb; i++) p[i] = 1. / std::sqrt( 2. * eig[i] / beta[i] );
 
     // Momentum transform p^-1 K^+ w K p^-1 
     // where p^-1 is a diagonal matrix
     for(auto mat = 0; mat < 4; mat++) {
       for (auto i = 0; i < nb; i++) {
         for (auto j = 0; j < nb; j++) {
-          // FIXME: once orthnormal transform is fixed, real cast wont be necessary
-          // anymore
-          ints.pVp[mat][j + i*nb] *= std::real(p[i] * p[j]);
+          ints.pVp[mat][j + i*nb] *= p[i] * p[j];
         }
       }
     }
 
+    std::complex<double>* W = output.UL;
+    int64_t LDW = 2*nb;
     // Form full spin-orbit coupling matrix W
-    _form_1e_soc_matrix(nb, W, ints.pVp, true);
+    _form_1e_soc_matrix(nb, W, LDW, ints.pVp, true);
+    detail::print_matrix(4*nb, core4c);
 
 
     // Subtract out 2mc^2 from W diagonals
     const double Wscale = 2. * LIGHTSPEED * LIGHTSPEED;
-    for(auto i = 0; i < 2*nb; i++) W[i + i*2*nb] -= Wscale;
+    for(auto i = 0; i < 2*nb; i++) W[i + i*LDW] -= Wscale;
 
     // P^-1 -> P
     for(auto i = 0; i < nb; i++) p[i] = 1./p[i];
@@ -249,18 +275,18 @@ namespace X2Chem {
     detail::print_matrix(4*nb, core4c);
 
     // Diagonalize 4C Core Hamiltonian
-    lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 4*nb, core4c, 4*nb, beta);
+    lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 4*nb, core4c, 4*nb, eig);
 
     std::cout << "4C Diag" << std::endl;
     detail::print_matrix(4*nb, core4c);
-    for (auto i = 0; i < 4*nb; i++) std::cout << "eig " << i << ": " << beta[i] << std::endl;
+    for (auto i = 0; i < 4*nb; i++) std::cout << "eig " << i << ": " << eig[i] << std::endl;
     std::cout << "MOVEC" << std::endl;
     for (auto i = 0; i < 2*nb; i++) std::cout << i << ": " << core4c[i + (2*nb)*4*nb] << " ";
     std::cout << std::endl;
 
     // Get large and small components of the eigenvectors
-    std::complex<double>* large = core4c + 8*nb*nb;
-    std::complex<double>* small = large + 2*nb;
+    std::complex<double>* large = CSCR3;
+    std::complex<double>* small = CSCR4;
 
     std::cout << "MOVEC" << std::endl;
     for (auto i = 0; i < 4*nb; i++) std::cout << i << ": " << large[i] << " ";
@@ -268,25 +294,16 @@ namespace X2Chem {
 
 
     // Compute inverse of large -> large^-1
-    detail::LUinv_square(2*nb, large, 4*nb, ipiv);
+    detail::LUinv_square(2*nb, large, 4*nb, reinterpret_cast<int64_t*>(eig));
 
-    //_print_matrix(4*nb, core4c);
-  
-    /*
-    std::complex<double>* TEST = new std::complex<double>[nb*nb]; 
-    TEST[0] = 2;
-    TEST[1] = 1;
-    TEST[2] = 6;
-    TEST[3] = 8;
-    std::cout << "TEST before" << std::endl;
-    _print_matrix(nb, TEST);
-    _LUinv_square(nb, TEST, nb, ipiv);
-    std::cout << "TEST after" << std::endl;
-    _print_matrix(nb, TEST);
-    */
-
+    // New pointers FIXME: messy
+    std::complex<double>* SCR1 = CSCR1;
+    std::complex<double>* SCR2 = SCR1 + 4*nbsq;
+    std::complex<double>* SCR3 = SCR2 + 4*nbsq;
+    std::complex<double>* SCR4 = SCR3 + 4*nbsq;
 
     // X = small * large^-1
+    std::complex<double>* X = SCR2;
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
                  2*nb, 2*nb, 2*nb, 1.0, small, 4*nb, large, 4*nb, 0.0, X, 2*nb);
 
@@ -295,23 +312,28 @@ namespace X2Chem {
     // R = sqrt(1 + X^+ * X)
 
     // R = X^+ * X
+    std::complex<double>* R = SCR3;
     blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
-                 2*nb, 2*nb, 2*nb, 1.0, X, 2*nb, X, 2*nb, 0.0, R, 2*nb);
+               2*nb, 2*nb, 2*nb, 1.0, X, 2*nb, X, 2*nb, 0.0, R, 2*nb);
 
     // R = R + I
     for(auto i = 0; i < 2*nb; i++) R[i + 2*nb*i] += 1.0;
 
     // Diagonalize R: R -> V * r * V^+
-    lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 2*nb, R, 2*nb, beta);
+    lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 2*nb, R, 2*nb, eig);
+
+    std::cout << std::setprecision(10) << std::endl;
+    for(auto i = 0; i < 2*nb; i++ )
+      std::cout << "R eig " << i << ": " << eig[i] << std::endl;
 
     // CSCR -> V * r^-0.25
     for(auto i = 0; i < 2*nb; i++)
     for(auto j = 0; j < 2*nb; j++)
-      CSCR[j + 2*nb*i] = R[j + 2*nb*i] * std::pow(beta[i],-0.25);
+      SCR1[j + i*2*nb] = R[j + i*2*nb] * std::pow(eig[i],-0.25);
 
     // R = SCR1 * SCR1**H
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::ConjTrans, 
-                 2*nb, 2*nb, 2*nb, 1.0, CSCR, 2*nb, CSCR, 2*nb, 0.0, R, 2*nb);
+                 2*nb, 2*nb, 2*nb, 1.0, SCR1, 2*nb, SCR1, 2*nb, 0.0, R, 2*nb);
 
     
     std::cout << "R" << std::endl;
@@ -322,126 +344,93 @@ namespace X2Chem {
     // Construct 2C CH
     // 2C CH = R * (V' + cp * X + X^+ * cp + X^+ * W' * X) * R
 
-    std::fill_n(output.coreH,4*nb*nb,std::complex<double>(0.));
+    std::fill_n(output.coreH,4*nbsq,std::complex<double>(0.));
 
     // Copy V_tilde into spin diagonal blocks of 2C CH
     detail::set_submat(nb, nb, V_tilde, nb, output.coreH, 2*nb);
-    detail::set_submat(nb, nb, V_tilde, nb, output.coreH + nb + (2*nb * nb) , 2*nb);
+    detail::set_submat(nb, nb, V_tilde, nb, output.coreH + nb + (2*nbsq) , 2*nb);
 
     // CSCR = cp * X
     for(auto i = 0; i < 2*nb; i++)
     for(auto j = 0; j < nb; j++) {
-      CSCR[j + 2*nb*i] = LIGHTSPEED * p[j] * X[j + 2*nb*i];
-      CSCR[j + nb + 2*nb*i] = LIGHTSPEED * p[j] * X[j + nb + 2*nb*i];
+      SCR1[j + 2*nb*i] = LIGHTSPEED * p[j] * X[j + 2*nb*i];
+      SCR1[j + nb + 2*nb*i] = LIGHTSPEED * p[j] * X[j + nb + 2*nb*i];
     }
 
     // 2C CH += CSCR + CSCR^+
     for(auto i = 0; i < 2*nb; i++)
     for(auto j = 0; j < 2*nb; j++) {
-      output.coreH[j + i*2*nb] += CSCR[j + i*2*nb] + std::conj(CSCR[i + j*2*nb]);
+      output.coreH[j + i*2*nb] += SCR1[j + i*2*nb] + std::conj(SCR1[i + j*2*nb]);
     }
 
     // CSCR = X**H * W
     blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
-                 2*nb, 2*nb, 2*nb, 1.0, X, 2*nb, W, 2*nb, 0.0, CSCR, 2*nb);
+                 2*nb, 2*nb, 2*nb, 1.0, X, 2*nb, W, LDW, 0.0, SCR1, 2*nb);
 
     // 2C CH += CSCR * X
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-                 2*nb, 2*nb, 2*nb, 1.0, CSCR, 2*nb, X, 2*nb, 1.0, output.coreH, 2*nb);
+                 2*nb, 2*nb, 2*nb, 1.0, SCR1, 2*nb, X, 2*nb, 1.0, output.coreH, 2*nb);
 
     // CSCR = 2C CH * R
     blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
-                 2*nb, 2*nb, 2*nb, 1.0, output.coreH, 2*nb, R, 2*nb, 0.0, CSCR, 2*nb);
+                 2*nb, 2*nb, 2*nb, 1.0, output.coreH, 2*nb, R, 2*nb, 0.0, SCR1, 2*nb);
 
     // 2C CH = R * CSCR
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-                 2*nb, 2*nb, 2*nb, 1.0, R, 2*nb, CSCR, 2*nb, 0.0, output.coreH, 2*nb);
+                 2*nb, 2*nb, 2*nb, 1.0, R, 2*nb, SCR1, 2*nb, 0.0, output.coreH, 2*nb);
 
 
-    // Eig test
-    //lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 2*nb, output.coreH, 2*nb, beta);
-    //std::cout << "2C eigs" << std::endl;
-    //for (auto i = 0; i < 2*nb; i++) std::cout << "eig " << i << ": " << beta[i] << "\n";
- 
+    std::complex<double>* extraScr = new std::complex<double>[4*nb*nb];
+    double* moreEig = new double[2*nb];
+    std::copy_n(output.coreH, 4*nb*nb, extraScr);
+    lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 2*nb, extraScr, 2*nb, moreEig);
 
+    std::cout << std::setprecision(10) << std::endl;
+    for( auto i = 0; i < 2*nb; i++ )
+      std::cout << "Eig " << i << ": " << moreEig[i] << std::endl;
  
     // Back Transform 2C CH
-    // K^-1 = S * K
-    double* SK = SCR1;
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-                 nb, nb, nb, 1.0, S, nb, K, nb, 0.0, SK, nb);
+    // K^-1 = K\dag
 
     // Transform 2C CH by block
+    // K H K\dag
     // Top-left
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, output.coreH, 2*nb, SK, nb, 0.0, CSCR, nb);
-
-    blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, SK, nb, CSCR, nb, 0.0, output.coreH, 2*nb);
-    
+    detail::transform(nb, output.coreH, 2*nb, K, nb, SCR1, nb, output.coreH, 2*nb, false);
     // Bottom-left
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, output.coreH + nb, 2*nb, SK, nb, 0.0, CSCR, nb);
-
-    blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, SK, nb, CSCR, nb, 0.0, output.coreH + nb, 2*nb);
-
+    detail::transform(nb, output.coreH + nb, 2*nb, K, nb, SCR1, nb, output.coreH + nb, 2*nb, false);
     // Top-right
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, output.coreH + 2*nb * nb, 2*nb, SK, nb, 0.0, CSCR, nb);
-
-    blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, SK, nb, CSCR, nb, 0.0, output.coreH + 2*nb * nb, 2*nb);
-
+    detail::transform(nb, output.coreH + 2*nb*nb, 2*nb, K, nb, SCR1, nb, output.coreH + 2*nbsq, 2*nb, false);
     // Bottom-right
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, output.coreH + 2*nb * nb + nb, 2*nb, SK, nb, 0.0, CSCR, nb);
+    detail::transform(nb, output.coreH + 2*nb*nb + nb, 2*nb, K, nb, SCR1, nb, output.coreH + 2*nbsq + nb, 2*nb, false);
 
-    blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, SK, nb, CSCR, nb, 0.0, output.coreH + 2*nb * nb + nb, 2*nb);
+    std::copy_n(output.coreH, 4*nb*nb, extraScr);
+    lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 2*nb, extraScr, 2*nb, moreEig);
 
-
+    std::cout << std::setprecision(10) << std::endl;
+    for( auto i = 0; i < 2*nb; i++ )
+      std::cout << "Eig " << i << ": " << moreEig[i] << std::endl;
+ 
 
     // Form U_X2C for picture change
-    _form_U(nb, output.UL, output.US, K, SK, X, R, p, CSCR); 
+    _form_U(nb, output.UL, output.US, K, X, R, p, SCR1); 
 
-    return;
   }
   
   // Form picture change unitary matrices UL and US
   void _form_U(const int64_t nb, std::complex<double>* UL, std::complex<double>* US,
-               double* K, double* SK, std::complex<double>* X, std::complex<double>* R, 
-               std::complex<double>* p, std::complex<double>* SCR) 
+               double* K, std::complex<double>* X, std::complex<double>* R, 
+               double* p, std::complex<double>* SCR) 
   {
 
     // Form UL = K * R * K^-1
     // Top-left
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, R, 2*nb, SK, nb, 0.0, SCR, nb);
-
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, K, nb, SCR, nb, 0.0, UL, 2*nb);
-
+    detail::transform(nb, R, 2*nb, K, nb, SCR, nb, UL, 2*nb, false);
     // Bottom-left
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, R + nb, 2*nb, SK, nb, 0.0, SCR, nb);
-
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, K, nb, SCR, nb, 0.0, UL + nb, 2*nb);
-
+    detail::transform(nb, R + nb, 2*nb, K, nb, SCR, nb, UL + nb, 2*nb, false);
     // Top-right
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, R + 2*nb * nb, 2*nb, SK, nb, 0.0, SCR, nb);
-
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, K, nb, SCR, nb, 0.0, UL + 2*nb * nb, 2*nb);
-
+    detail::transform(nb, R + 2*nb*nb, 2*nb, K, nb, SCR, nb, UL + 2*nb*nb, 2*nb, false);
     // Bottom-right
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, R + 2*nb * nb + nb, 2*nb, SK, nb, 0.0, SCR, nb);
-
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, K, nb, SCR, nb, 0.0, UL + 2*nb * nb + nb, 2*nb);
+    detail::transform(nb, R + 2*nb*nb + nb, 2*nb, K, nb, SCR, nb, UL + 2*nb*nb + nb, 2*nb, false);
 
 
     // Form US = K * 2cp^-1 * X * R * K^-1
@@ -463,33 +452,14 @@ namespace X2Chem {
     // Transform K * R * K^-1
     // where R = 2 * c * p^-1 * R * X
     // Top-left
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, R, 2*nb, SK, nb, 0.0, SCR, nb);
-
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, K, nb, SCR, nb, 0.0, US, 2*nb);
-
+    detail::transform(nb, R, 2*nb, K, nb, SCR, nb, US, 2*nb, false);
     // Bottom-left
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, R + nb, 2*nb, SK, nb, 0.0, SCR, nb);
-
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, K, nb, SCR, nb, 0.0, US + nb, 2*nb);
-
+    detail::transform(nb, R + nb, 2*nb, K, nb, SCR, nb, US + nb, 2*nb, false);
     // Top-right
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, R + 2*nb * nb, 2*nb, SK, nb, 0.0, SCR, nb);
-
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, K, nb, SCR, nb, 0.0, US + 2*nb * nb, 2*nb);
-
+    detail::transform(nb, R + 2*nb*nb, 2*nb, K, nb, SCR, nb, US + 2*nb*nb, 2*nb, false);
     // Bottom-right
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, R + 2*nb * nb + nb, 2*nb, SK, nb, 0.0, SCR, nb);
+    detail::transform(nb, R + 2*nb*nb + nb, 2*nb, K, nb, SCR, nb, US + 2*nb*nb + nb, 2*nb, false);
 
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, K, nb, SCR, nb, 0.0, US + 2*nb * nb + nb, 2*nb);
-    return;
   }
 
   /**

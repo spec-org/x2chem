@@ -1,6 +1,8 @@
-#include <stdio.h>
+#include <algorithm>
 #include <iostream>
+#include <stdio.h>
 #include "x2chem.hpp"
+#include <lapack.hh>
 
 int main() {
 
@@ -18,6 +20,9 @@ int main() {
     std::complex<double> *US        = new std::complex<double>[2*nb*2*nb];
     std::complex<double> *coreX2C  = new std::complex<double>[2*nb*2*nb];
     std::complex<double> *core4C   = new std::complex<double>[4*nb*4*nb];
+
+    double* SCR1 = new double[nb*nb];
+    double* SCR2 = new double[nb*nb];
 
 
     for (int64_t i = 0; i < 4*nb; i++)
@@ -130,6 +135,17 @@ int main() {
     V[3] = -4.03736535;
     */
 
+    std::copy_n(S, nb*nb, SCR1);
+    int64_t nbuse = X2Chem::orthonormalize(nb, SCR1, SCR2, 1e-12);
+    X2Chem::detail::print_matrix(nb, SCR1);
+
+    X2Chem::detail::transform(nb, T, nb, SCR1, nb, SCR2, nb, T, nb, true);
+    X2Chem::detail::transform(nb, V, nb, SCR1, nb, SCR2, nb, V, nb, true);
+    X2Chem::detail::transform(nb, pVp[0], nb, SCR1, nb, SCR2, nb, pVp[0], nb, true);
+    X2Chem::detail::transform(nb, pVp[1], nb, SCR1, nb, SCR2, nb, pVp[1], nb, true);
+    X2Chem::detail::transform(nb, pVp[2], nb, SCR1, nb, SCR2, nb, pVp[2], nb, true);
+    X2Chem::detail::transform(nb, pVp[3], nb, SCR1, nb, SCR2, nb, pVp[3], nb, true);
+
     // initialize structs
     X2Chem::Integrals integrals{S,T,V,pVp};
     X2Chem::X2COperators output{UL, US, coreX2C};
@@ -137,7 +153,29 @@ int main() {
     // X2C routine
     X2Chem::x2c_hamiltonian(nb, integrals, output, core4C);
 
+    double* transform = new double[nb*nb];
+    std::complex<double>* extraMat = new std::complex<double>[2*nb*2*nb];
+    std::complex<double>* SCR3 = new std::complex<double>[2*nb*2*nb];
 
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nb, nb, 1.0, S, nb, SCR1, nb, 0.0, transform, nb);
+
+
+    // X2Chem::detail::set_submat(nb, nb, SCR1, nb, transform, 2*nb);
+    // X2Chem::detail::set_submat(nb, nb, SCR1, nb, transform+2*nb*nb+nb, 2*nb);
+    // X2Chem::detail::print_matrix(2*nb, transform);
+    // X2Chem::detail::transform(2*nb, extraMat, 2*nb, transform, 2*nb, SCR3, 2*nb, extraMat, 2*nb, false);
+    // Top-left
+    X2Chem::detail::transform(nb, coreX2C, 2*nb, transform, nb, SCR3, nb, extraMat, 2*nb, false);
+    X2Chem::detail::transform(nb, coreX2C + nb, 2*nb, transform, nb, SCR3, nb, extraMat + nb, 2*nb, false);
+    X2Chem::detail::transform(nb, coreX2C + 2*nb*nb, 2*nb, transform, nb, SCR3, nb, extraMat + 2*nb*nb, 2*nb, false);
+    X2Chem::detail::transform(nb, coreX2C + 2*nb*nb + nb, 2*nb, transform, nb, SCR3, nb, extraMat + 2*nb*nb + nb, 2*nb, false);
+    lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 2*nb, extraMat, 2*nb, transform);
+
+    std::cout << std::setprecision(10) << std::endl;
+    for( auto i = 0; i < 2*nb; i++ ) {
+      std::cout << "Back eig " << i << ": " << transform[i] << std::endl;
+    }
 
     return 0;
 }
