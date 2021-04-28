@@ -93,7 +93,7 @@ TEST( X2C_Hamiltonian, UH_91Plus ) {
   double* SCR2 = SCR1 + nbsq;
 
   std::copy_n(S.data(), nbsq, SCR1);
-  int64_t nbuse = orthonormalize(nb, SCR1, SCR2, 1e-12);
+  orthonormalize(nb, SCR1, SCR2, 1e-12);
 
   // Transform all integrals in place
   detail::transform(nb, T.data(), nb, SCR1, nb, SCR2, nb, T.data(), nb, true);

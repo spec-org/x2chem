@@ -136,7 +136,7 @@ int main() {
     */
 
     std::copy_n(S, nb*nb, SCR1);
-    int64_t nbuse = X2Chem::orthonormalize(nb, SCR1, SCR2, 1e-12);
+    X2Chem::orthonormalize(nb, SCR1, SCR2, 1e-12);
     X2Chem::detail::print_matrix(nb, SCR1);
 
     X2Chem::detail::transform(nb, T, nb, SCR1, nb, SCR2, nb, T, nb, true);

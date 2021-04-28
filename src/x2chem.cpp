@@ -203,7 +203,6 @@ namespace X2Chem {
     std::complex<double>* SCR1 = core4c;
     std::complex<double>* SCR2 = SCR1 + 4*nbsq;
     std::complex<double>* SCR3 = SCR2 + 4*nbsq;
-    std::complex<double>* SCR4 = SCR3 + 4*nbsq;
 
     // Double alias for SCR1
     double* DSCR1 = reinterpret_cast<double*>(SCR1);
@@ -219,7 +218,6 @@ namespace X2Chem {
     std::complex<double>* W = output.UL;
 
     // Integral short names
-    double* S = ints.S;
     double* T = ints.T;
     double* V = ints.V;
 
