@@ -380,32 +380,32 @@ namespace X2Chem {
     detail::set_submat(nb, nb, V_tilde, nb, output.coreH, 2*nb);
     detail::set_submat(nb, nb, V_tilde, nb, output.coreH + nb + (2*nbsq) , 2*nb);
 
-    // CSCR = cp * X
+    // SCR1 = cp * X
     for(auto i = 0; i < 2*nb; i++)
     for(auto j = 0; j < nb; j++) {
       SCR1[j + 2*nb*i] = LIGHTSPEED * p[j] * X[j + 2*nb*i];
       SCR1[j + nb + 2*nb*i] = LIGHTSPEED * p[j] * X[j + nb + 2*nb*i];
     }
 
-    // 2C CH += CSCR + CSCR^+
+    // 2C CH += SCR1 + SCR1^+
     for(auto i = 0; i < 2*nb; i++)
     for(auto j = 0; j < 2*nb; j++) {
       output.coreH[j + i*2*nb] += SCR1[j + i*2*nb] + std::conj(SCR1[i + j*2*nb]);
     }
 
-    // CSCR = X**H * W
+    // SCR1 = X**H * W
     blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
                  2*nb, 2*nb, 2*nb, 1.0, X, 2*nb, W, LDW, 0.0, SCR1, 2*nb);
 
-    // 2C CH += CSCR * X
+    // 2C CH += SCR1 * X
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
                  2*nb, 2*nb, 2*nb, 1.0, SCR1, 2*nb, X, 2*nb, 1.0, output.coreH, 2*nb);
 
-    // CSCR = 2C CH * R
+    // SCR1 = 2C CH * R
     blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
                  2*nb, 2*nb, 2*nb, 1.0, output.coreH, 2*nb, R, 2*nb, 0.0, SCR1, 2*nb);
 
-    // 2C CH = R * CSCR
+    // 2C CH = R * SCR1
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
                  2*nb, 2*nb, 2*nb, 1.0, R, 2*nb, SCR1, 2*nb, 0.0, output.coreH, 2*nb);
 
@@ -435,14 +435,34 @@ namespace X2Chem {
     // Form U_X2C for picture change
     //
 
-    _form_U(nb, output.UL, output.US, K, X, R, p, SCR1); 
+    _form_picture_change(nb, output.UL, output.US, K, X, R, p, SCR1); 
 
   }
   
-  // Form picture change unitary matrices UL and US
-  void _form_U(const int64_t nb, std::complex<double>* UL, std::complex<double>* US,
-               double* K, std::complex<double>* X, std::complex<double>* R, 
-               double* p, std::complex<double>* SCR) 
+  /**
+   * @brief Form picture change matrices UL and US for 
+   *        X2C property evaluation
+   *
+   * Forms both the picture change matrices UL and US requiring
+   * intermediate matrices from the main x2c_hamiltonian function.
+   * Assumes matrices are contiguous in memory. Both UL and US
+   * are transformed out of the K basis and into the orthonormal
+   * AO basis,assuming orthogonalized matrices were input into
+   * x2c_hamiltonian(). UL, US, and R are overwritten. 
+   *
+   * @param[in]   nb        Number of spatial basis functions
+   * @param[in]   UL        Large component picture change matrix (2*nb x 2*nb)
+   * @param[in]   US        Small component picture change matrix (2*nb x 2*nb)
+   * @param[in]   K         Kinetic basis transform (nb x nb)
+   * @param[in]   X         Large to small component transfrom matrix (2*nb x 2*nb)
+   * @param[in]   R         X2C renormalization matrix (2*nb x 2*nb)
+   * @param[in]   p         Momentum basis eigenvalues (nb)
+   * @param[in]   SCR       Complex scratch space (2*nb x 2*nb)
+   *
+   **/
+  void _form_picture_change(const int64_t nb, std::complex<double>* UL, 
+          std::complex<double>* US, double* K, std::complex<double>* X, 
+          std::complex<double>* R, double* p, std::complex<double>* SCR) 
   {
 
     // Form UL = K * R * K^-1
@@ -459,9 +479,12 @@ namespace X2Chem {
     // Form US = K * 2cp^-1 * X * R * K^-1
     // (Overwrites R)
 
-    // X*R -> R
+    // X*R -> SCR
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               2*nb, 2*nb, 2*nb, 1.0, X, 2*nb, R, 2*nb, 0.0, R, 2*nb);
+               2*nb, 2*nb, 2*nb, 1.0, X, 2*nb, R, 2*nb, 0.0, SCR, 2*nb);
+
+    // Copy X*R back into R
+    std::copy_n(SCR, 4*nb*nb, R);
 
     x2chem_dbgout("X*R", 2*nb, R);
 

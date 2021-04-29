@@ -1,5 +1,4 @@
 #include <gtest/gtest.h>
-
 #include <x2chem.hpp>
 
 using namespace X2Chem;

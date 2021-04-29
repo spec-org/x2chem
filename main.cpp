@@ -154,18 +154,24 @@ int main() {
     X2Chem::x2c_hamiltonian(nbu, integrals, output, core4C);
 
     double* transform = new double[nb*nb];
+    std::complex<double>* eig = new std::complex<double>[2*nb];
     std::complex<double>* extraMat = new std::complex<double>[2*nb*2*nb];
     std::complex<double>* SCR3 = new std::complex<double>[2*nb*2*nb];
+    std::complex<double>* SCR4 = new std::complex<double>[2*nb*2*nb];
+    std::complex<double>* ULS = new std::complex<double>[2*nb*2*nb];
+    std::complex<double>* USS = new std::complex<double>[2*nb*2*nb];
 
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nbu, nb, 1.0, S, nb, SCR1, nb, 0.0, transform, nb);
-
+    //blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+    //           nb, nbu, nb, 1.0, S, nb, SCR1, nb, 0.0, transform, nb);
+    std::copy_n(SCR1, nb*nb, transform);
 
     // X2Chem::detail::set_submat(nb, nb, SCR1, nb, transform, 2*nb);
     // X2Chem::detail::set_submat(nb, nb, SCR1, nb, transform+2*nb*nb+nb, 2*nb);
     // X2Chem::detail::print_matrix(2*nb, transform);
     // X2Chem::detail::transform(2*nb, extraMat, 2*nb, transform, 2*nb, SCR3, 2*nb, extraMat, 2*nb, false);
     // Top-left
+
+    /*
     X2Chem::detail::transform(nbu, nb, coreX2C, 2*nbu, transform, nb, SCR3, nb, extraMat, 2*nb, false);
     X2Chem::detail::transform(nbu, nb, coreX2C + nbu, 2*nbu, transform, nb, SCR3, nb, extraMat + nb, 2*nb, false);
     X2Chem::detail::transform(nbu, nb, coreX2C + 2*nbu*nbu, 2*nbu, transform, nb, SCR3, nb, extraMat + 2*nb*nb, 2*nb, false);
@@ -176,6 +182,56 @@ int main() {
     for( auto i = 0; i < 2*nb; i++ ) {
       std::cout << "Back eig " << i << ": " << transform[i] << std::endl;
     }
+    */
+
+    std::cout << "UL" << "\n";
+    X2Chem::detail::print_matrix(2*nb, UL);
+
+    X2Chem::detail::transform(nbu, nb, UL, 2*nbu, transform, nb, SCR3, nb, extraMat, 2*nb, false);
+    X2Chem::detail::transform(nbu, nb, UL + nbu, 2*nbu, transform, nb, SCR3, nb, extraMat + nb, 2*nb, false);
+    X2Chem::detail::transform(nbu, nb, UL + 2*nbu*nbu, 2*nbu, transform, nb, SCR3, nb, extraMat + 2*nb*nb, 2*nb, false);
+    X2Chem::detail::transform(nbu, nb, UL + 2*nbu*nbu + nbu, 2*nbu, transform, nb, SCR3, nb, extraMat + 2*nb*nb + nb, 2*nb, false);
+
+    // multiply S on right
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nbu, nb, 1.0, extraMat, 2*nb, S, nb, 0.0, ULS, 2*nb);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nbu, nb, 1.0, extraMat + nb, 2*nb, S, nb, 0.0, ULS + nb, 2*nb);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nbu, nb, 1.0, extraMat + 2*nb*nb, 2*nb, S, nb, 0.0, ULS + 2*nb*nb, 2*nb);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nbu, nb, 1.0, extraMat + 2*nb*nb +nb, 2*nb, S, nb, 0.0, ULS + 2*nb*nb +nb, 2*nb);
+
+    std::cout << "ULS backtransform" << "\n";
+    X2Chem::detail::print_matrix(2*nb, ULS);
+    //lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 2*nb, extraMat, 2*nb, transform);
+    lapack::geev(lapack::Job::Vec, lapack::Job::NoVec, 2*nb, ULS, 2*nb, eig, SCR4, 2*nb, SCR3, 2*nb);
+    std::cout << std::setprecision(10) << std::endl;
+    for( auto i = 0; i < 2*nb; i++ ) {
+      std::cout << "UL eig " << i << ": " << eig[i] << std::endl;
+    }
+
+
+    std::cout << "US" << "\n";
+    X2Chem::detail::print_matrix(2*nb, US);
+
+    X2Chem::detail::transform(nbu, nb, US, 2*nbu, transform, nb, SCR3, nb, extraMat, 2*nb, false);
+    X2Chem::detail::transform(nbu, nb, US + nbu, 2*nbu, transform, nb, SCR3, nb, extraMat + nb, 2*nb, false);
+    X2Chem::detail::transform(nbu, nb, US + 2*nbu*nbu, 2*nbu, transform, nb, SCR3, nb, extraMat + 2*nb*nb, 2*nb, false);
+    X2Chem::detail::transform(nbu, nb, US + 2*nbu*nbu + nbu, 2*nbu, transform, nb, SCR3, nb, extraMat + 2*nb*nb + nb, 2*nb, false);
+
+    // multiply S on right
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nbu, nb, 1.0, extraMat, 2*nb, S, nb, 0.0, USS, 2*nb);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nbu, nb, 1.0, extraMat + nb, 2*nb, S, nb, 0.0, USS + nb, 2*nb);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nbu, nb, 1.0, extraMat + 2*nb*nb, 2*nb, S, nb, 0.0, USS + 2*nb*nb, 2*nb);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nbu, nb, 1.0, extraMat + 2*nb*nb +nb, 2*nb, S, nb, 0.0, USS + 2*nb*nb +nb, 2*nb);
+
+    std::cout << "USS backtransform" << "\n";
+    X2Chem::detail::print_matrix(2*nb, USS);
 
     return 0;
 }

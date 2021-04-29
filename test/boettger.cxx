@@ -1,11 +1,10 @@
 #include <gtest/gtest.h>
-
 #include <x2chem.hpp>
 
 using namespace X2Chem;
 
 
-TEST( Boettger, UH_91p ) {
+TEST( Boettger, UH_91Plus ) {
 
   // Boettger test using the following CQ input
   // [Molecule]

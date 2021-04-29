@@ -1,9 +1,6 @@
 #include <algorithm>
-
 #include <gtest/gtest.h>
-
 #include <blas.hh>
-
 #include <x2chem.hpp>
 
 

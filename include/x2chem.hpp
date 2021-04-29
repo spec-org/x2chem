@@ -75,7 +75,7 @@ namespace X2Chem {
   void _form_1e_soc_matrix(const int64_t, std::complex<double>*, int64_t, std::array<double*,4>, bool);
 
   // Form picture change unitary matrices UL and US
-  void _form_U(const int64_t, std::complex<double>*, std::complex<double>*,
+  void _form_picture_change(const int64_t, std::complex<double>*, std::complex<double>*,
                double*, std::complex<double>*, std::complex<double>*, 
                double*, std::complex<double>*);
 
@@ -109,12 +109,12 @@ namespace X2Chem {
     void print_matrix(const int64_t N, const T* matrix)
     {
 
-      std::cout << std::scientific << std::setprecision(5);
+      std::cout << std::scientific << std::setprecision(8);
       // Print matrix column major
       for (auto i = 0; i < N; i++) {
         std::cout << "Row " << i << ":  ";
         for (auto j = 0; j < N; j++) {
-          std::cout << std::setw(8) << matrix[j*N + i] << " ";
+          std::cout << std::setw(11) << matrix[j*N + i] << " ";
         }
         std::cout << std::endl;
       }

@@ -1,9 +1,6 @@
 #include <algorithm>
-
 #include <gtest/gtest.h>
-
 #include <lapack.hh>
-
 #include <x2chem.hpp>
 
 
