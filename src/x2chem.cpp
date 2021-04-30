@@ -487,6 +487,7 @@ namespace X2Chem {
 
     // Form UL = K * R * K^-1
     detail::blockTransform(nb, nb, R, 2*nb, K, nb, SCR, nb, UL, 2*nb, false);
+    x2chem_dbgout("UL", 2*nb, UL);
 
     // Form US = K * 2cp^-1 * X * R * K^-1
     // (Overwrites R)
@@ -510,6 +511,7 @@ namespace X2Chem {
     // Transform K * R * K^-1
     // where R = 2 * c * p^-1 * R * X
     detail::blockTransform(nb, nb, R, 2*nb, K, nb, SCR, nb, US, 2*nb, false);
+    x2chem_dbgout("US", 2*nb, US);
 
   }
 
@@ -684,8 +686,9 @@ namespace X2Chem {
     std::complex<double>* extraMat = CSCR + nbsq;
 
     // U ML U\dag
-    detail::blockTransform(nbu, nb, output.UL, 2*nbu, T, nb, CSCR, nb,
-                           output.UL, 2*nb, false);
+    detail::blockTransform(nbu, nb, output.UL, 2*nbu, S, nb, CSCR, nb,
+                           extraMat, 2*nb, false);
+    x2chem_dbgout("V.UL.VT", 2*nb, extraMat);
     // U ML U\dag S
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
                nb, nb, nb, 1., extraMat, 2*nb, ints.S, nb, 0.,
@@ -699,11 +702,13 @@ namespace X2Chem {
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
                nb, nb, nb, 1., extraMat + 2*nb*nb + nb, 2*nb, ints.S, nb, 0.,
                output.UL + 2*nb*nb + nb, 2*nb);
+    x2chem_dbgout("V.UL.VT.S", 2*nb, output.UL);
 
 
     // U MS U\dag
-    detail::blockTransform(nbu, nb, output.US, 2*nbu, T, nb, CSCR, nb,
-                           output.US, 2*nb, false);
+    detail::blockTransform(nbu, nb, output.US, 2*nbu, S, nb, CSCR, nb,
+                           extraMat, 2*nb, false);
+    x2chem_dbgout("V.US.VT", 2*nb, extraMat);
     // U MS U\dag S
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
                nb, nb, nb, 1., extraMat, 2*nb, ints.S, nb, 0.,
@@ -717,6 +722,7 @@ namespace X2Chem {
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
                nb, nb, nb, 1., extraMat + 2*nb*nb + nb, 2*nb, ints.S, nb, 0.,
                output.US + 2*nb*nb + nb, 2*nb);
+    x2chem_dbgout("V.US.VT.S", 2*nb, output.US);
 
   }
 

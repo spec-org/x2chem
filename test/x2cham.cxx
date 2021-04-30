@@ -129,7 +129,6 @@ std::vector<std::complex<double>> getExpectedAO(int64_t size) {
 }
 
 std::vector<double> getEigValsOrtho(int64_t size) {
-
   std::vector<double> expectedEig(size, 0.);
 
   expectedEig[0] = -5.4709561492e+01;
@@ -158,6 +157,163 @@ std::vector<double> getEigValsAO(int64_t size) {
 
   return expectedEig;
 }
+
+std::vector<std::complex<double>> getULOrtho(int64_t size) {
+  std::vector<std::complex<double>> expectUL(size, 0.);
+
+  expectUL[0] = std::complex<double>(9.99990905451666e-01,0.00000000000000e+00);
+  expectUL[3] = std::complex<double>(3.59633681223936e-06,0.00000000000000e+00);
+  expectUL[5] = std::complex<double>(6.33536307388156e-09,0.00000000000000e+00);
+  expectUL[6] = std::complex<double>(0.00000000000000e+00,6.33536307106944e-09);
+  expectUL[9] = std::complex<double>(9.99993346934954e-01,0.00000000000000e+00);
+  expectUL[10] = std::complex<double>(0.00000000000000e+00,-6.23212279698970e-09);
+  expectUL[12] = std::complex<double>(-6.33536306967103e-09,0.00000000000000e+00);
+  expectUL[15] = std::complex<double>(-1.24180151080622e-09,0.00000000000000e+00);
+  expectUL[17] = std::complex<double>(0.00000000000000e+00,6.23212279698970e-09);
+  expectUL[18] = std::complex<double>(9.99993346934954e-01,0.00000000000000e+00);
+  expectUL[20] = std::complex<double>(0.00000000000000e+00,-6.33536304929818e-09);
+  expectUL[23] = std::complex<double>(0.00000000000000e+00,-1.24180152600221e-09);
+  expectUL[24] = std::complex<double>(3.59633681229488e-06,0.00000000000000e+00);
+  expectUL[27] = std::complex<double>(9.99988650628242e-01,0.00000000000000e+00);
+  expectUL[29] = std::complex<double>(1.24180155943968e-09,0.00000000000000e+00);
+  expectUL[30] = std::complex<double>(0.00000000000000e+00,1.24180156187250e-09);
+  expectUL[33] = std::complex<double>(-6.33536306967103e-09,0.00000000000000e+00);
+  expectUL[34] = std::complex<double>(0.00000000000000e+00,6.33536304929818e-09);
+  expectUL[36] = std::complex<double>(9.99990905451666e-01,0.00000000000000e+00);
+  expectUL[39] = std::complex<double>(3.59633681301652e-06,0.00000000000000e+00);
+  expectUL[40] = std::complex<double>(6.33536307388155e-09,0.00000000000000e+00);
+  expectUL[43] = std::complex<double>(1.24180155943968e-09,0.00000000000000e+00);
+  expectUL[45] = std::complex<double>(9.99993346934953e-01,0.00000000000000e+00);
+  expectUL[46] = std::complex<double>(0.00000000000000e+00,6.23212237371717e-09);
+  expectUL[48] = std::complex<double>(0.00000000000000e+00,-6.33536307106944e-09);
+  expectUL[51] = std::complex<double>(0.00000000000000e+00,-1.24180156187250e-09);
+  expectUL[53] = std::complex<double>(0.00000000000000e+00,-6.23212237371717e-09);
+  expectUL[54] = std::complex<double>(9.99993346934953e-01,0.00000000000000e+00);
+  expectUL[57] = std::complex<double>(-1.24180151080622e-09,0.00000000000000e+00);
+  expectUL[58] = std::complex<double>(0.00000000000000e+00,1.24180152600221e-09);
+  expectUL[60] = std::complex<double>(3.59633681301652e-06,0.00000000000000e+00);
+  expectUL[63] = std::complex<double>(9.99988650628242e-01,0.00000000000000e+00);
+
+  return expectUL;
+}
+
+std::vector<std::complex<double>> getUSOrtho(int64_t size) {
+  std::vector<std::complex<double>> expectUS(size, 0.);
+
+  expectUS[0] = std::complex<double>(9.99826814771920e-01,0.00000000000000e+00);
+  expectUS[3] = std::complex<double>(-1.76635065149588e-04,0.00000000000000e+00);
+  expectUS[5] = std::complex<double>(-4.76159229310070e-04,0.00000000000000e+00);
+  expectUS[6] = std::complex<double>(0.00000000000000e+00,-4.76159229309741e-04);
+  expectUS[9] = std::complex<double>(9.99746128678913e-01,2.17013364743612e-14);
+  expectUS[10] = std::complex<double>(0.00000000000000e+00,4.68354010751905e-04);
+  expectUS[12] = std::complex<double>(4.22923649128596e-04,1.92895206400246e-14);
+  expectUS[15] = std::complex<double>(1.88732070392437e-04,0.00000000000000e+00);
+  expectUS[17] = std::complex<double>(-3.78030939884866e-14,-4.68354010772046e-04);
+  expectUS[18] = std::complex<double>(9.99746128678898e-01,3.12503657933644e-14);
+  expectUS[20] = std::complex<double>(0.00000000000000e+00,4.22923649121554e-04);
+  expectUS[23] = std::complex<double>(0.00000000000000e+00,1.88732070424737e-04);
+  expectUS[24] = std::complex<double>(-7.82497870212007e-05,0.00000000000000e+00);
+  expectUS[27] = std::complex<double>(1.00002412321525e+00,0.00000000000000e+00);
+  expectUS[29] = std::complex<double>(-9.32564309057209e-05,0.00000000000000e+00);
+  expectUS[30] = std::complex<double>(0.00000000000000e+00,-9.32564309061679e-05);
+  expectUS[33] = std::complex<double>(4.76159229295499e-04,2.52801523204643e-14);
+  expectUS[34] = std::complex<double>(0.00000000000000e+00,-4.76159229295761e-04);
+  expectUS[36] = std::complex<double>(9.99826814771909e-01,0.00000000000000e+00);
+  expectUS[39] = std::complex<double>(-1.76635065151032e-04,-1.52566472698272e-14);
+  expectUS[40] = std::complex<double>(-4.22923649129771e-04,0.00000000000000e+00);
+  expectUS[43] = std::complex<double>(-1.88732070414317e-04,0.00000000000000e+00);
+  expectUS[45] = std::complex<double>(9.99746128678922e-01,-2.67815012788136e-14);
+  expectUS[46] = std::complex<double>(-2.73669975570101e-14,-4.68354010787333e-04);
+  expectUS[48] = std::complex<double>(0.00000000000000e+00,4.22923649129039e-04);
+  expectUS[51] = std::complex<double>(0.00000000000000e+00,1.88732070416019e-04);
+  expectUS[53] = std::complex<double>(2.81441536742477e-14,4.68354010787214e-04);
+  expectUS[54] = std::complex<double>(9.99746128678923e-01,-2.64672994892273e-14);
+  expectUS[57] = std::complex<double>(9.32564308804507e-05,0.00000000000000e+00);
+  expectUS[58] = std::complex<double>(-3.09077308018046e-14,-9.32564308930139e-05);
+  expectUS[60] = std::complex<double>(-7.82497870457921e-05,-1.50147656827899e-14);
+  expectUS[63] = std::complex<double>(1.00002412321525e+00,0.00000000000000e+00);
+
+  return expectUS;
+}
+
+std::vector<std::complex<double>> getULAO(int64_t size) {
+  std::vector<std::complex<double>> expectUL(size, 0.);
+
+  expectUL[0] = std::complex<double>(9.99985322968168e-01,0.00000000000000e+00);
+  expectUL[3] = std::complex<double>(-3.75686529641150e-06,0.00000000000000e+00);
+  expectUL[5] = std::complex<double>(-5.08706700925181e-09,0.00000000000000e+00);
+  expectUL[6] = std::complex<double>(0.00000000000000e+00,-5.08706700564307e-09);
+  expectUL[9] = std::complex<double>(9.99993346934954e-01,0.00000000000000e+00);
+  expectUL[10] = std::complex<double>(0.00000000000000e+00,-6.23212279698970e-09);
+  expectUL[12] = std::complex<double>(2.18075283882525e-09,0.00000000000000e+00);
+  expectUL[15] = std::complex<double>(-4.92415550503408e-09,0.00000000000000e+00);
+  expectUL[17] = std::complex<double>(0.00000000000000e+00,6.23212279698970e-09);
+  expectUL[18] = std::complex<double>(9.99993346934954e-01,0.00000000000000e+00);
+  expectUL[20] = std::complex<double>(0.00000000000000e+00,2.18075281061591e-09);
+  expectUL[23] = std::complex<double>(0.00000000000000e+00,-4.92415551039591e-09);
+  expectUL[24] = std::complex<double>(1.50204187276959e-06,0.00000000000000e+00);
+  expectUL[27] = std::complex<double>(9.99994233111741e-01,0.00000000000000e+00);
+  expectUL[29] = std::complex<double>(6.21127022712266e-09,0.00000000000000e+00);
+  expectUL[30] = std::complex<double>(0.00000000000000e+00,6.21127022571634e-09);
+  expectUL[33] = std::complex<double>(5.08706702751128e-09,0.00000000000000e+00);
+  expectUL[34] = std::complex<double>(0.00000000000000e+00,-5.08706700246658e-09);
+  expectUL[36] = std::complex<double>(9.99985322968167e-01,0.00000000000000e+00);
+  expectUL[39] = std::complex<double>(-3.75686529685559e-06,0.00000000000000e+00);
+  expectUL[40] = std::complex<double>(-2.18075278746541e-09,0.00000000000000e+00);
+  expectUL[43] = std::complex<double>(4.92415556111588e-09,0.00000000000000e+00);
+  expectUL[45] = std::complex<double>(9.99993346934953e-01,0.00000000000000e+00);
+  expectUL[46] = std::complex<double>(0.00000000000000e+00,6.23212237371717e-09);
+  expectUL[48] = std::complex<double>(0.00000000000000e+00,2.18075278320127e-09);
+  expectUL[51] = std::complex<double>(0.00000000000000e+00,-4.92415556222633e-09);
+  expectUL[53] = std::complex<double>(0.00000000000000e+00,-6.23212237371717e-09);
+  expectUL[54] = std::complex<double>(9.99993346934953e-01,0.00000000000000e+00);
+  expectUL[57] = std::complex<double>(-6.21127020135423e-09,0.00000000000000e+00);
+  expectUL[58] = std::complex<double>(0.00000000000000e+00,6.21127019006647e-09);
+  expectUL[60] = std::complex<double>(1.50204187332470e-06,0.00000000000000e+00);
+  expectUL[63] = std::complex<double>(9.99994233111741e-01,0.00000000000000e+00);
+
+  return expectUL;
+}
+
+std::vector<std::complex<double>> getUSAO(int64_t size) {
+  std::vector<std::complex<double>> expectUS(size, 0.);
+
+  expectUS[0] = std::complex<double>(1.00011930926894e+00,0.00000000000000e+00);
+  expectUS[3] = std::complex<double>(2.52772345584407e-04,0.00000000000000e+00);
+  expectUS[5] = std::complex<double>(3.82373041861601e-04,0.00000000000000e+00);
+  expectUS[6] = std::complex<double>(0.00000000000000e+00,3.82373041861105e-04);
+  expectUS[9] = std::complex<double>(9.99746128678913e-01,2.17013364743612e-14);
+  expectUS[10] = std::complex<double>(0.00000000000000e+00,4.68354010751905e-04);
+  expectUS[12] = std::complex<double>(-2.86731487259412e-05,-1.09536159847631e-14);
+  expectUS[15] = std::complex<double>(4.45622283195567e-04,1.06789683892014e-14);
+  expectUS[17] = std::complex<double>(-3.78030939884866e-14,-4.68354010772046e-04);
+  expectUS[18] = std::complex<double>(9.99746128678898e-01,3.12503657933644e-14);
+  expectUS[20] = std::complex<double>(1.31604573211798e-14,-2.86731486863145e-05);
+  expectUS[23] = std::complex<double>(0.00000000000000e+00,4.45622283227297e-04);
+  expectUS[24] = std::complex<double>(-5.54639022590786e-05,0.00000000000000e+00);
+  expectUS[27] = std::complex<double>(9.99731628718228e-01,0.00000000000000e+00);
+  expectUS[29] = std::complex<double>(-4.66798108744805e-04,0.00000000000000e+00);
+  expectUS[30] = std::complex<double>(0.00000000000000e+00,-4.66798108744714e-04);
+  expectUS[33] = std::complex<double>(-3.82373041860047e-04,-2.50253116813995e-14);
+  expectUS[34] = std::complex<double>(-1.43616032868030e-14,3.82373041854593e-04);
+  expectUS[36] = std::complex<double>(1.00011930926894e+00,1.65525987502224e-14);
+  expectUS[39] = std::complex<double>(2.52772345585850e-04,1.47034842449987e-14);
+  expectUS[40] = std::complex<double>(2.86731487024326e-05,0.00000000000000e+00);
+  expectUS[43] = std::complex<double>(-4.45622283220394e-04,0.00000000000000e+00);
+  expectUS[45] = std::complex<double>(9.99746128678922e-01,-2.67815012788136e-14);
+  expectUS[46] = std::complex<double>(-2.73669975570101e-14,-4.68354010787333e-04);
+  expectUS[48] = std::complex<double>(0.00000000000000e+00,-2.86731487001410e-05);
+  expectUS[51] = std::complex<double>(0.00000000000000e+00,4.45622283221865e-04);
+  expectUS[53] = std::complex<double>(2.81441536742477e-14,4.68354010787214e-04);
+  expectUS[54] = std::complex<double>(9.99746128678923e-01,-2.64672994892273e-14);
+  expectUS[57] = std::complex<double>(4.66798108720373e-04,2.00587163328820e-14);
+  expectUS[58] = std::complex<double>(-1.36191720313990e-14,-4.66798108726293e-04);
+  expectUS[60] = std::complex<double>(-5.54639022488645e-05,0.00000000000000e+00);
+  expectUS[63] = std::complex<double>(9.99731628718215e-01,-2.11238874234042e-14);
+
+  return expectUS;
+}
+
 
 using namespace X2Chem;
 
@@ -247,6 +403,23 @@ TEST( X2C_Hamiltonian, UH_91Plus ) {
   for(auto i = 0; i < 2*nb; i++) {
     EXPECT_NEAR(eig[i], expectedEig[i], 1e-8);
   }
+
+  // X2C Large picture change
+  std::vector<std::complex<double>> expectUL = getULOrtho(4*nbsq);
+
+  for(auto i = 0; i < 4*nbsq; i++) {
+    EXPECT_NEAR(UL[i].real(), expectUL[i].real(), 1e-8);
+    EXPECT_NEAR(UL[i].imag(), expectUL[i].imag(), 1e-8);
+  }
+
+  // X2C small picture change
+  std::vector<std::complex<double>> expectUS = getUSOrtho(4*nbsq);
+
+  for(auto i = 0; i < 4*nbsq; i++) {
+    EXPECT_NEAR(US[i].real(), expectUS[i].real(), 1e-8);
+    EXPECT_NEAR(US[i].imag(), expectUS[i].imag(), 1e-8);
+  }
+
 
   delete[] eig;
   delete[] moreSCR;
@@ -338,6 +511,23 @@ TEST( X2C_Hamiltonian, UH_91Plus_Mem ) {
     EXPECT_NEAR(eig[i], expectedEig[i], 1e-8);
   }
 
+  // X2C Large picture change
+  std::vector<std::complex<double>> expectUL = getULOrtho(4*nbsq);
+
+  for(auto i = 0; i < 4*nbsq; i++) {
+    EXPECT_NEAR(UL[i].real(), expectUL[i].real(), 1e-8);
+    EXPECT_NEAR(UL[i].imag(), expectUL[i].imag(), 1e-8);
+  }
+
+  // X2C small picture change
+  std::vector<std::complex<double>> expectUS = getUSOrtho(4*nbsq);
+
+  for(auto i = 0; i < 4*nbsq; i++) {
+    EXPECT_NEAR(US[i].real(), expectUS[i].real(), 1e-8);
+    EXPECT_NEAR(US[i].imag(), expectUS[i].imag(), 1e-8);
+  }
+
+
   delete[] eig;
   delete[] moreSCR;
   delete[] SCR1, SCR2;
@@ -389,6 +579,7 @@ TEST( X2C_Hamiltonian, UH_91Plus_AO ) {
   // Expected values
   //
 
+  // X2C Core
   std::vector<std::complex<double>> expectCore = getExpectedAO(4*nbsq);
   detail::print_matrix(2*nb, expectCore.data());
 
@@ -409,6 +600,23 @@ TEST( X2C_Hamiltonian, UH_91Plus_AO ) {
   for(auto i = 0; i < 2*nb; i++) {
     EXPECT_NEAR(eig[i], expectedEig[i], 1e-8);
   }
+
+  // X2C Large picture change
+  std::vector<std::complex<double>> expectUL = getULAO(4*nbsq);
+
+  for(auto i = 0; i < 4*nbsq; i++) {
+    EXPECT_NEAR(UL[i].real(), expectUL[i].real(), 1e-8);
+    EXPECT_NEAR(UL[i].imag(), expectUL[i].imag(), 1e-8);
+  }
+
+  // X2C small picture change
+  std::vector<std::complex<double>> expectUS = getUSAO(4*nbsq);
+
+  for(auto i = 0; i < 4*nbsq; i++) {
+    EXPECT_NEAR(US[i].real(), expectUS[i].real(), 1e-8);
+    EXPECT_NEAR(US[i].imag(), expectUS[i].imag(), 1e-8);
+  }
+
 
   delete[] eig;
   delete[] moreSCR;
@@ -457,8 +665,8 @@ TEST( X2C_Hamiltonian, UH_91Plus_AO_Mem ) {
   // Expected values
   //
 
+  // X2C Core matrix
   std::vector<std::complex<double>> expectCore = getExpectedAO(4*nbsq);
-  detail::print_matrix(2*nb, expectCore.data());
 
   for(auto i = 0; i < 4*nbsq; i++) {
     EXPECT_NEAR(coreX2C[i].real(), expectCore[i].real(), 1e-8);
@@ -476,6 +684,22 @@ TEST( X2C_Hamiltonian, UH_91Plus_AO_Mem ) {
 
   for(auto i = 0; i < 2*nb; i++) {
     EXPECT_NEAR(eig[i], expectedEig[i], 1e-8);
+  }
+
+  // X2C Large picture change
+  std::vector<std::complex<double>> expectUL = getULAO(4*nbsq);
+
+  for(auto i = 0; i < 4*nbsq; i++) {
+    EXPECT_NEAR(UL[i].real(), expectUL[i].real(), 1e-8);
+    EXPECT_NEAR(UL[i].imag(), expectUL[i].imag(), 1e-8);
+  }
+
+  // X2C small picture change
+  std::vector<std::complex<double>> expectUS = getUSAO(4*nbsq);
+
+  for(auto i = 0; i < 4*nbsq; i++) {
+    EXPECT_NEAR(US[i].real(), expectUS[i].real(), 1e-8);
+    EXPECT_NEAR(US[i].imag(), expectUS[i].imag(), 1e-8);
   }
 
   delete[] eig;

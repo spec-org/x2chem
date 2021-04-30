@@ -206,12 +206,25 @@ int main() {
     std::cout << "UL" << "\n";
     X2Chem::detail::print_matrix(2*nb, UL);
 
+    std::cout << std::setprecision(14) << std::endl;
+    for(auto i = 0; i < 4*nb*nb; i++) {
+      if( std::abs(UL[i]) > 1e-13 ) {
+        std::cout << "expectUL[" << i << "] = std::complex<double>(";
+        double real = UL[i].real();
+        double imag = UL[i].imag();
+        std::cout << (std::abs(real) > 1e-14 ? real : 0.) << ",";
+        std::cout << (std::abs(imag) > 1e-14 ? imag : 0.) << ");" << std::endl;
+      }
+    }
+
     X2Chem::detail::blockTransform(nbu, nb, UL, 2*nbu, transform, nb, SCR3, nb, extraMat, 2*nb, false);
     // X2Chem::detail::transform(nbu, nb, UL, 2*nbu, transform, nb, SCR3, nb, extraMat, 2*nb, false);
     // X2Chem::detail::transform(nbu, nb, UL + nbu, 2*nbu, transform, nb, SCR3, nb, extraMat + nb, 2*nb, false);
     // X2Chem::detail::transform(nbu, nb, UL + 2*nbu*nbu, 2*nbu, transform, nb, SCR3, nb, extraMat + 2*nb*nb, 2*nb, false);
     // X2Chem::detail::transform(nbu, nb, UL + 2*nbu*nbu + nbu, 2*nbu, transform, nb, SCR3, nb, extraMat + 2*nb*nb + nb, 2*nb, false);
 
+    std::cout << "VULV" << std::endl;
+    X2Chem::detail::print_matrix(2*nb, extraMat);
     // multiply S on right
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
                nb, nbu, nb, 1.0, extraMat, 2*nb, S, nb, 0.0, ULS, 2*nb);
@@ -224,6 +237,7 @@ int main() {
 
     std::cout << "ULS backtransform" << "\n";
     X2Chem::detail::print_matrix(2*nb, ULS);
+
     //lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 2*nb, extraMat, 2*nb, transform);
     lapack::geev(lapack::Job::Vec, lapack::Job::NoVec, 2*nb, ULS, 2*nb, eig, SCR4, 2*nb, SCR3, 2*nb);
     std::cout << std::setprecision(10) << std::endl;
@@ -234,6 +248,17 @@ int main() {
 
     std::cout << "US" << "\n";
     X2Chem::detail::print_matrix(2*nb, US);
+
+    std::cout << std::setprecision(14) << std::endl;
+    for(auto i = 0; i < 4*nb*nb; i++) {
+      if( std::abs(US[i]) > 1e-13 ) {
+        std::cout << "expectUS[" << i << "] = std::complex<double>(";
+        double real = US[i].real();
+        double imag = US[i].imag();
+        std::cout << (std::abs(real) > 1e-14 ? real : 0.) << ",";
+        std::cout << (std::abs(imag) > 1e-14 ? imag : 0.) << ");" << std::endl;
+      }
+    }
 
     X2Chem::detail::transform(nbu, nb, US, 2*nbu, transform, nb, SCR3, nb, extraMat, 2*nb, false);
     X2Chem::detail::transform(nbu, nb, US + nbu, 2*nbu, transform, nb, SCR3, nb, extraMat + nb, 2*nb, false);
