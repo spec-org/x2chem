@@ -147,7 +147,8 @@ int main() {
     X2Chem::detail::transform(nb, nbu, pVp[3], nb, SCR1, nb, SCR2, nb, pVp[3], nbu, true);
 
     // initialize structs
-    X2Chem::Integrals integrals{S,T,V,pVp};
+    std::array<const double*, 4> pVp_c = {pVp[0], pVp[1], pVp[2], pVp[3]};
+    X2Chem::Integrals integrals{S,T,V,pVp_c};
     X2Chem::X2COperators output{UL, US, coreX2C};
 
     // X2C routine
@@ -161,36 +162,55 @@ int main() {
     std::complex<double>* ULS = new std::complex<double>[2*nb*2*nb];
     std::complex<double>* USS = new std::complex<double>[2*nb*2*nb];
 
-    //blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-    //           nb, nbu, nb, 1.0, S, nb, SCR1, nb, 0.0, transform, nb);
     std::copy_n(SCR1, nb*nb, transform);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nbu, nb, 1.0, S, nb, SCR1, nb, 0.0, transform, nb);
 
     // X2Chem::detail::set_submat(nb, nb, SCR1, nb, transform, 2*nb);
     // X2Chem::detail::set_submat(nb, nb, SCR1, nb, transform+2*nb*nb+nb, 2*nb);
     // X2Chem::detail::print_matrix(2*nb, transform);
     // X2Chem::detail::transform(2*nb, extraMat, 2*nb, transform, 2*nb, SCR3, 2*nb, extraMat, 2*nb, false);
     // Top-left
+    //
+    std::cout << "core Ham" << std::endl;
+    X2Chem::detail::print_matrix(2*nbu, coreX2C);
 
-    /*
+    std::cout << "Transform" << std::endl;
+    X2Chem::detail::print_matrix(2*nbu, transform);
+
+
     X2Chem::detail::transform(nbu, nb, coreX2C, 2*nbu, transform, nb, SCR3, nb, extraMat, 2*nb, false);
     X2Chem::detail::transform(nbu, nb, coreX2C + nbu, 2*nbu, transform, nb, SCR3, nb, extraMat + nb, 2*nb, false);
     X2Chem::detail::transform(nbu, nb, coreX2C + 2*nbu*nbu, 2*nbu, transform, nb, SCR3, nb, extraMat + 2*nb*nb, 2*nb, false);
     X2Chem::detail::transform(nbu, nb, coreX2C + 2*nbu*nbu + nbu, 2*nbu, transform, nb, SCR3, nb, extraMat + 2*nb*nb + nb, 2*nb, false);
+
+    std::cout << std::setprecision(14) << std::endl;
+    for(auto i = 0; i < 4*nb*nb; i++) {
+      if( std::abs(extraMat[i]) > 1e-13 ) {
+        std::cout << "expectCore[" << i << "] = std::complex<double>(";
+        double real = extraMat[i].real();
+        double imag = extraMat[i].imag();
+        std::cout << (std::abs(real) > 1e-14 ? real : 0.) << ",";
+        std::cout << (std::abs(imag) > 1e-14 ? imag : 0.) << ");" << std::endl;
+      }
+    }
+
     lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 2*nb, extraMat, 2*nb, transform);
 
     std::cout << std::setprecision(10) << std::endl;
     for( auto i = 0; i < 2*nb; i++ ) {
       std::cout << "Back eig " << i << ": " << transform[i] << std::endl;
     }
-    */
 
+    std::copy_n(SCR1, nb*nb, transform);
     std::cout << "UL" << "\n";
     X2Chem::detail::print_matrix(2*nb, UL);
 
-    X2Chem::detail::transform(nbu, nb, UL, 2*nbu, transform, nb, SCR3, nb, extraMat, 2*nb, false);
-    X2Chem::detail::transform(nbu, nb, UL + nbu, 2*nbu, transform, nb, SCR3, nb, extraMat + nb, 2*nb, false);
-    X2Chem::detail::transform(nbu, nb, UL + 2*nbu*nbu, 2*nbu, transform, nb, SCR3, nb, extraMat + 2*nb*nb, 2*nb, false);
-    X2Chem::detail::transform(nbu, nb, UL + 2*nbu*nbu + nbu, 2*nbu, transform, nb, SCR3, nb, extraMat + 2*nb*nb + nb, 2*nb, false);
+    X2Chem::detail::blockTransform(nbu, nb, UL, 2*nbu, transform, nb, SCR3, nb, extraMat, 2*nb, false);
+    // X2Chem::detail::transform(nbu, nb, UL, 2*nbu, transform, nb, SCR3, nb, extraMat, 2*nb, false);
+    // X2Chem::detail::transform(nbu, nb, UL + nbu, 2*nbu, transform, nb, SCR3, nb, extraMat + nb, 2*nb, false);
+    // X2Chem::detail::transform(nbu, nb, UL + 2*nbu*nbu, 2*nbu, transform, nb, SCR3, nb, extraMat + 2*nb*nb, 2*nb, false);
+    // X2Chem::detail::transform(nbu, nb, UL + 2*nbu*nbu + nbu, 2*nbu, transform, nb, SCR3, nb, extraMat + 2*nb*nb + nb, 2*nb, false);
 
     // multiply S on right
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 

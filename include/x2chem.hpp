@@ -12,12 +12,11 @@ namespace X2Chem {
   constexpr double LIGHTSPEED = 137.035999074; // Atomic units
 
   // Inputs to x2c_hamiltonian
-  // FIXME: Change to const
   struct Integrals {
-    double* S;                  ///< Overlap
-    double* T;                  ///< Kinetic
-    double* V;                  ///< Nuclear potential
-    std::array<double*,4> pVp;  ///< Spin-orbit PV.P, PVxP(X), PVxP(Y), PVxP(Z) 
+    const double* S;                  ///< Overlap
+    const double* T;                  ///< Kinetic
+    const double* V;                  ///< Nuclear potential
+    std::array<const double*,4> pVp;  ///< Spin-orbit PV.P, PVxP(X), PVxP(Y), PVxP(Z) 
   };
 
   // Operators output by x2c_hamiltonian
@@ -56,6 +55,16 @@ namespace X2Chem {
 
   // Compute X2C Core Hamiltonian
   void x2c_hamiltonian(const int64_t, const Integrals&, X2COperators&, void*);
+
+  // Compute X2C Core Hamiltonian with internal scratch
+  void x2c_hamiltonian(const int64_t, const Integrals&, X2COperators&);
+
+  // Compute X2C Core Hamiltonian with nonorthogonal integrals
+  void x2c_hamiltonian_ao(const int64_t, const Integrals&, X2COperators&, void*, void*);
+
+  // Compute X2C Core Hamiltonian with nonorthogonal integrals and internal
+  //   scratch
+  void x2c_hamiltonian_ao(const int64_t, const Integrals&, X2COperators&);
   
   // Boettger 2e SOC scaling factor
   void boettger_2e_soc(int64_t, std::complex<double>*, double*, int64_t*);
@@ -91,6 +100,10 @@ namespace X2Chem {
 
     template <typename OpT, typename TransT>
     void transform(int64_t n, int64_t m, OpT* A, int64_t LDA, TransT* U,
+      int64_t LDU, OpT* SCR, int64_t LDS, OpT* B, int64_t LDB, bool forward);
+
+    template <typename OpT, typename TransT>
+    void blockTransform(int64_t n, int64_t m, OpT* A, int64_t LDA, TransT* U,
       int64_t LDU, OpT* SCR, int64_t LDS, OpT* B, int64_t LDB, bool forward);
 
     // Set submats of larger matrix

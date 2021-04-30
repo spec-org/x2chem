@@ -4,6 +4,7 @@
 #include <blas.hh>
 #include <x2chem.hpp>
 
+#define X2CHEM_DEBUG_PRINT
 
 #ifdef X2CHEM_DEBUG_PRINT
   #define x2chem_dbgout(name, size, location) \
@@ -79,6 +80,31 @@ namespace X2Chem {
         int64_t, std::complex<double>*, int64_t, std::complex<double>*,
         int64_t, std::complex<double>*, int64_t, std::complex<double>*,
         int64_t, bool);
+
+    /**
+     * @brief Transforms a 2n x 2n matrix according to a logically block
+     *        diagonal matrix
+     **/
+    template <typename OpT, typename TransT>
+    void blockTransform(int64_t n, int64_t m, OpT* A, int64_t LDA, TransT* U,
+      int64_t LDU, OpT* SCR, int64_t LDS, OpT* B, int64_t LDB, bool forward) {
+      detail::transform(n, m, A, LDA, U, LDU, SCR, LDS, B, LDB, forward);
+      detail::transform(n, m, A+n, LDA, U, LDU, SCR, LDS, B+m, LDB, forward);
+      detail::transform(n, m, A+2*n*n, LDA, U, LDU, SCR, LDS, B+2*m*m, LDB, forward);
+      detail::transform(n, m, A+2*n*n+n, LDA, U, LDU, SCR, LDS, B+2*m*m+m, LDB, forward);
+    }
+
+    template void blockTransform<double,double>(int64_t, int64_t, double*,
+        int64_t, double*, int64_t, double*, int64_t, double*, int64_t, bool);
+
+    template void blockTransform<std::complex<double>,double>(int64_t, int64_t,
+        std::complex<double>*, int64_t, double*, int64_t,
+        std::complex<double>*, int64_t, std::complex<double>*, int64_t, bool);
+
+    template void blockTransform<std::complex<double>,std::complex<double>>(
+        int64_t, int64_t, std::complex<double>*, int64_t,
+        std::complex<double>*, int64_t, std::complex<double>*, int64_t,
+        std::complex<double>*, int64_t, bool);
 
 
     void LUinv_square(int64_t n, std::complex<double>* A, int64_t lda, int64_t* ipiv)
@@ -236,6 +262,7 @@ namespace X2Chem {
     std::complex<double>* SCR1 = core4c;
     std::complex<double>* SCR2 = SCR1 + 4*nbsq;
     std::complex<double>* SCR3 = SCR2 + 4*nbsq;
+    std::complex<double>* SCR4 = SCR3 + 4*nbsq;
 
     // Double alias for SCR1
     double* DSCR1 = reinterpret_cast<double*>(SCR1);
@@ -249,10 +276,11 @@ namespace X2Chem {
 
     // Use UL for W
     std::complex<double>* W = output.UL;
+    double* DSCRW = reinterpret_cast<double*>(W);
 
     // Integral short names
-    double* T = ints.T;
-    double* V = ints.V;
+    const double* T = ints.T;
+    const double* V = ints.V;
 
 
     //
@@ -273,19 +301,20 @@ namespace X2Chem {
     // Transform non-rel potential V -> V_tilde
     // K^+ V K
     blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, K, nb, V, nb, 0.0, DSCR1, nb);
+               nb, nb, nb, 1.0, K, nb, V, nb, 0.0, DSCRW, nb);
 
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               nb, nb, nb, 1.0, DSCR1, nb, K, nb, 0.0, V_tilde, nb);
+               nb, nb, nb, 1.0, DSCRW, nb, K, nb, 0.0, V_tilde, nb);
 
     // Transform pV.p and pVxp integrals
     // K^+ w K
+    std::array<double*, 4> pVp_t = {DSCR1, DSCR1+nbsq, DSCR1+2*nbsq, DSCR1+3*nbsq};
     for(auto mat = 0; mat < 4; mat++) {
       blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, 
-                 nb, nb, nb, 1.0, K, nb, ints.pVp[mat], nb, 0.0, DSCR1, nb);
+                 nb, nb, nb, 1.0, K, nb, ints.pVp[mat], nb, 0.0, DSCRW, nb);
 
       blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-                 nb, nb, nb, 1.0, DSCR1, nb, K, nb, 0.0, ints.pVp[mat], nb);
+                 nb, nb, nb, 1.0, DSCRW, nb, K, nb, 0.0, pVp_t[mat], nb);
     }
 
     // Momentum transform p^-1 K^+ w K p^-1 
@@ -293,7 +322,7 @@ namespace X2Chem {
     for(auto mat = 0; mat < 4; mat++) {
       for (auto i = 0; i < nb; i++) {
         for (auto j = 0; j < nb; j++) {
-          ints.pVp[mat][j + i*nb] *= p[i] * p[j];
+          pVp_t[mat][j + i*nb] *= p[i] * p[j];
         }
       }
     }
@@ -304,10 +333,8 @@ namespace X2Chem {
 
     // Form full spin-orbit coupling matrix W
     int64_t LDW = 2*nb;
-    _form_1e_soc_matrix(nb, W, LDW, ints.pVp, true);
-    x2chem_dbgout("W Matrix", 2*nb, W);
-
-    // Subtract out 2mc^2 from W diagonals
+    _form_1e_soc_matrix(nb, W, LDW, pVp_t, true);
+    x2chem_dbgout("W Matrix", 2*nb, W);    // Subtract out 2mc^2 from W diagonals
     const double Wscale = 2. * LIGHTSPEED * LIGHTSPEED;
     for(auto i = 0; i < 2*nb; i++) W[i + i*LDW] -= Wscale;
 
@@ -419,14 +446,7 @@ namespace X2Chem {
 
     // Transform 2C CH by block
     // K H K\dag
-    // Top-left
-    detail::transform(nb, nb, output.coreH, 2*nb, K, nb, SCR1, nb, output.coreH, 2*nb, false);
-    // Bottom-left
-    detail::transform(nb, nb, output.coreH + nb, 2*nb, K, nb, SCR1, nb, output.coreH + nb, 2*nb, false);
-    // Top-right
-    detail::transform(nb, nb, output.coreH + 2*nb*nb, 2*nb, K, nb, SCR1, nb, output.coreH + 2*nbsq, 2*nb, false);
-    // Bottom-right
-    detail::transform(nb, nb, output.coreH + 2*nb*nb + nb, 2*nb, K, nb, SCR1, nb, output.coreH + 2*nbsq + nb, 2*nb, false);
+    detail::blockTransform(nb, nb, output.coreH, 2*nb, K, nb, SCR1, nb, output.coreH, 2*nb, false);
 
     x2chem_dbgout("2C Core in ortho basis", 2*nb, output.coreH);
 
@@ -466,15 +486,7 @@ namespace X2Chem {
   {
 
     // Form UL = K * R * K^-1
-    // Top-left
-    detail::transform(nb, nb, R, 2*nb, K, nb, SCR, nb, UL, 2*nb, false);
-    // Bottom-left
-    detail::transform(nb, nb, R + nb, 2*nb, K, nb, SCR, nb, UL + nb, 2*nb, false);
-    // Top-right
-    detail::transform(nb, nb, R + 2*nb*nb, 2*nb, K, nb, SCR, nb, UL + 2*nb*nb, 2*nb, false);
-    // Bottom-right
-    detail::transform(nb, nb, R + 2*nb*nb + nb, 2*nb, K, nb, SCR, nb, UL + 2*nb*nb + nb, 2*nb, false);
-
+    detail::blockTransform(nb, nb, R, 2*nb, K, nb, SCR, nb, UL, 2*nb, false);
 
     // Form US = K * 2cp^-1 * X * R * K^-1
     // (Overwrites R)
@@ -497,14 +509,7 @@ namespace X2Chem {
 
     // Transform K * R * K^-1
     // where R = 2 * c * p^-1 * R * X
-    // Top-left
-    detail::transform(nb, nb, R, 2*nb, K, nb, SCR, nb, US, 2*nb, false);
-    // Bottom-left
-    detail::transform(nb, nb, R + nb, 2*nb, K, nb, SCR, nb, US + nb, 2*nb, false);
-    // Top-right
-    detail::transform(nb, nb, R + 2*nb*nb, 2*nb, K, nb, SCR, nb, US + 2*nb*nb, 2*nb, false);
-    // Bottom-right
-    detail::transform(nb, nb, R + 2*nb*nb + nb, 2*nb, K, nb, SCR, nb, US + 2*nb*nb + nb, 2*nb, false);
+    detail::blockTransform(nb, nb, R, 2*nb, K, nb, SCR, nb, US, 2*nb, false);
 
   }
 
@@ -557,8 +562,6 @@ namespace X2Chem {
 
       }
     }   
-
-    return;
   }
 
   /**
@@ -606,5 +609,130 @@ namespace X2Chem {
 
   template int64_t orthonormalize<double>(int64_t, double*, double*, double);
   template int64_t orthonormalize<std::complex<double>>(int64_t, std::complex<double>*, double*, double);
+
+  /**
+   * @brief Provides a wrapper to x2c_hamiltonian that manages scratch memory
+   *
+   * @param      nb     Dimension of input and output matrices in the
+   *                    orthonormal basis
+   * @param[in]  ints   Input integral matrices
+   * @param[out] output X2C core hamiltonian and picture change matrices
+   *
+   **/
+  void x2c_hamiltonian(const int64_t nb, const Integrals& ints,
+    X2COperators& output)
+  {
+    void* scratch = malloc(16*nb*nb*sizeof(std::complex<double>)
+                           + (2*nb*nb + nb) * sizeof(double));
+    x2c_hamiltonian(nb, ints, output, scratch);
+    free(scratch);
+  }
+
+  /**
+   * @brief Forms the core X2C hamiltonian when given non-orthogonal integrals
+   **/
+  void x2c_hamiltonian_ao(const int64_t nb, const Integrals& ints,
+    X2COperators& output, void* intsScratch, void* scratch)
+  {
+    int64_t nbsq = nb*nb;
+
+    double* S = reinterpret_cast<double*>(intsScratch);
+    double* T = S + nbsq;
+    double* V = T + nbsq;
+    double* pVp = V + nbsq;
+
+    double* DSCR = reinterpret_cast<double*>(scratch);
+    std::complex<double>* CSCR = reinterpret_cast<std::complex<double>*>(scratch);
+
+    // Copy nonorthogonal integrals into scratch
+    std::copy_n(ints.S, nbsq, S);
+    std::copy_n(ints.T, nbsq, T);
+    std::copy_n(ints.V, nbsq, V);
+    for(auto i = 0; i < 4; i++)
+      std::copy_n(ints.pVp[i], nbsq, pVp + i*nbsq);
+
+    // Orthogonalize
+    // TODO: configurable cutoff for orthogonalization or a better choice
+    auto nbu = orthonormalize(nb, S, DSCR, 1e-12);
+    for(auto i = 1; i < 7; i++) {
+      double* mat = S + i*nbsq;
+      detail::transform(nb, nbu, mat, nb, S, nb, DSCR, nb, mat, nbu, true);
+    }
+
+    Integrals orthoInts{S, T, V, {pVp, pVp+nbsq, pVp+2*nbsq, pVp+3*nbsq}};
+
+    // Call main routine
+    x2c_hamiltonian(nbu, orthoInts, output, scratch);
+
+    // Store inverse orthogonalization in T
+    // U^-1\dag = SU
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+               nb, nbu, nb, 1.0, ints.S, nb, S, nb, 0.0, T, nb);
+
+    // Transform the core into the nonorthogonal basis
+    detail::blockTransform(nbu, nb, output.coreH, 2*nbu, T, nb, CSCR, nb,
+                           output.coreH, 2*nb, false);
+
+    // Transform the picture change matrices into the "non-orthogonal basis"
+    // Since these are actually transformation matrices themselves, we need to
+    // do:  U M U^-1 = U M U\dag S
+
+    // XXX: This implementation isn't the fastest - we could directly use the
+    //   inverse transform above but this is a little cleaner. Can be easily
+    //   optimized if necessary.
+
+    std::complex<double>* extraMat = CSCR + nbsq;
+
+    // U ML U\dag
+    detail::blockTransform(nbu, nb, output.UL, 2*nbu, T, nb, CSCR, nb,
+                           output.UL, 2*nb, false);
+    // U ML U\dag S
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               nb, nb, nb, 1., extraMat, 2*nb, ints.S, nb, 0.,
+               output.UL, 2*nb);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               nb, nb, nb, 1., extraMat + nb, 2*nb, ints.S, nb, 0.,
+               output.UL + nb, 2*nb);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               nb, nb, nb, 1., extraMat + 2*nb*nb, 2*nb, ints.S, nb, 0.,
+               output.UL + 2*nb*nb, 2*nb);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               nb, nb, nb, 1., extraMat + 2*nb*nb + nb, 2*nb, ints.S, nb, 0.,
+               output.UL + 2*nb*nb + nb, 2*nb);
+
+
+    // U MS U\dag
+    detail::blockTransform(nbu, nb, output.US, 2*nbu, T, nb, CSCR, nb,
+                           output.US, 2*nb, false);
+    // U MS U\dag S
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               nb, nb, nb, 1., extraMat, 2*nb, ints.S, nb, 0.,
+               output.US, 2*nb);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               nb, nb, nb, 1., extraMat + nb, 2*nb, ints.S, nb, 0.,
+               output.US + nb, 2*nb);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               nb, nb, nb, 1., extraMat + 2*nb*nb, 2*nb, ints.S, nb, 0.,
+               output.US + 2*nb*nb, 2*nb);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               nb, nb, nb, 1., extraMat + 2*nb*nb + nb, 2*nb, ints.S, nb, 0.,
+               output.US + 2*nb*nb + nb, 2*nb);
+
+  }
+
+  /**
+   * @brief Forms the core X2C hamiltonian when given non-orthogonal integrals
+   *        and allocates memory within
+   **/
+  void x2c_hamiltonian_ao(const int64_t nb, const Integrals& ints,
+    X2COperators& output)
+  {
+    void* scratch = malloc(16*nb*nb*sizeof(std::complex<double>)
+                           + (2*nb*nb + nb) * sizeof(double));
+    void* intsScratch = malloc(7*nb*nb*sizeof(double));
+    x2c_hamiltonian_ao(nb, ints, output, intsScratch, scratch);
+    free(scratch);
+    free(intsScratch);
+  }
 
 } // namespace X2Chem
