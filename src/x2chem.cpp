@@ -2,9 +2,10 @@
 #include <algorithm>
 #include <lapack.hh>
 #include <blas.hh>
-#include <x2chem.hpp>
 
-#define X2CHEM_DEBUG_PRINT
+#include <x2chem.hpp>
+#include <x2chem/detail.hpp>
+
 
 #ifdef X2CHEM_DEBUG_PRINT
   #define x2chem_dbgout(name, size, location) \
@@ -121,123 +122,179 @@ namespace X2Chem {
 
     }
 
+
+
+    void build_4c_core_ham(const int64_t nb, double* V, double* p, 
+                            std::complex<double>* W, std::complex<double>* core4c)
+    {
+
+      // Zero out 4C Core Ham memory
+      std::fill_n(core4c,8*nb*nb,std::complex<double>(0.));
+      for( auto i = 0; i < 2*nb; i++ )
+        std::fill_n(core4c + 8*nb*nb + 4*nb*i, 2*nb, 0.);
+
+      // Set proper matrices to subblocks of 4C Hamiltonian
+      
+      // Transformed 1C potential V 
+      detail::set_submat(nb, nb, V, nb, core4c, 4*nb);
+      detail::set_submat(nb, nb, V, nb, core4c + nb + (4*nb * nb) , 4*nb);
+      
+      // Off-diagonal c*p terms
+      std::complex<double>* CP11 = core4c + 8*nb*nb;
+      std::complex<double>* CP12 = CP11   + 4*nb*nb + nb;
+      std::complex<double>* CP21 = core4c + 2*nb;
+      std::complex<double>* CP22 = CP21   + 4*nb*nb + nb;
+
+      for (auto i = 0; i < nb; i++) {
+        CP11[i + 4*nb*i] = LIGHTSPEED * p[i];
+        CP12[i + 4*nb*i] = LIGHTSPEED * p[i];
+        CP21[i + 4*nb*i] = LIGHTSPEED * p[i];
+        CP22[i + 4*nb*i] = LIGHTSPEED * p[i];
+      }
+
+      // Spin orbit matrix W
+      detail::set_submat(2*nb, 2*nb, W, 2*nb, core4c + 2*nb + (4*nb * 2*nb) , 4*nb);
+    }
+
+
+    /**
+     * @brief Builds the 1e spin-orbit coupling (SOC) matrix from 
+     *        real 1C pVp integrals, corresponding to the bottom right 
+     *        block of the 4C Hamiltonian. 
+     *
+     * Modifies the W pointer, and assumes W is 2*nb x 2*nb 
+     * in dimension and is contiguous in memory. The W matrix
+     * is formed by 4 different nb x nb blocks. 
+     *
+     *      [ pV.p + i (pVxp)(Z)        |  (pVxp)(Y) + i (pVxp)(X) ]
+     *  W = [ ------------------------  |  ----------------------- ]
+     *      [ -(pVxp)(Y) + i (pVxp)(X)  |  pV.p - i (pVxp)(Z)      ]
+     *
+     *
+     * @param[in]   nb        Number of spatial basis functions
+     * @param[in]   W         Pointer to the W 1e SOC Matrix
+     * @param[in]   pVp       Array of 4 pointers to each real pVp 
+     *                        matrix input by the user, ordered 
+     *                        pV.p, pVxp(X), pVxp(Y), pVxp(Z)
+     * @param[in]   soc       Boolean where true computes the full
+     *                        1e SOC matrix, false only computes the 
+     *                        on diagonal blocks for scalar relativity
+     *                        without SOC.
+     *
+     **/
+    void form_1e_soc_matrix(const int64_t nb, std::complex<double>* W, int64_t LDW,
+                             std::array<double*,4> pVp, bool soc)
+    {
+      if( soc ) {
+
+        // W = [ W1  W2 ]
+        //     [ W3  W4 ]
+        std::complex<double> *W1 = W;
+        std::complex<double> *W2 = W1 + nb*LDW;
+        std::complex<double> *W3 = W1 + nb;
+        std::complex<double> *W4 = W2 + nb;
+
+        for(auto i = 0; i < nb; i++) {
+          for(auto j = 0; j < nb; j++) {
+
+            // W1 = pV.p + i (pVxp)(Z)
+            W1[j + i*LDW] =  pVp[0][j + i*nb] + std::complex<double>(0.,1.) * pVp[3][j + i*nb];
+
+            // W2 = (pVxp)(Y) + i (pVxp)(X)
+            W2[j + i*LDW] =  pVp[2][j + i*nb] + std::complex<double>(0.,1.) * pVp[1][j + i*nb];
+
+            // W3 = -(pVxp)(Y) + i (pVxp)(X)
+            W3[j + i*LDW] = -pVp[2][j + i*nb] + std::complex<double>(0.,1.) * pVp[1][j + i*nb];
+
+            // W4 = pV.p - i (pVxp)(Z)
+            W4[j + i*LDW] =  pVp[0][j + i*nb] - std::complex<double>(0.,1.) * pVp[3][j + i*nb];
+          }
+        }
+
+      } else {
+        // FIXME: Scalar X2C calcs should be completely real 
+        // W = [ W1  0  ]
+        //     [ 0   W4 ]
+        std::complex<double> *W1 = W;
+        std::complex<double> *W2 = W1 + nb*LDW;
+        std::complex<double> *W3 = W1 + nb;
+        std::complex<double> *W4 = W2 + nb;
+
+        for(auto i = 0; i < nb; i++) {
+          for(auto j = 0; j < nb; j++) {
+
+            // W1 = pV.p 
+            W1[j + i*LDW] = pVp[0][j + i*nb];
+
+            // W4 = pV.p
+            W4[j + i*LDW] = pVp[0][j + i*nb];
+
+            // Zero out W2 and W3 blocks
+            W2[j + i*LDW] = 0.0;
+            W3[j + i*LDW] = 0.0;
+          }
+        }
+      
+      }
+    } 
+
+    /**
+     * @brief Form picture change matrices UL and US for 
+     *        X2C property evaluation
+     *
+     * Forms both the picture change matrices UL and US requiring
+     * intermediate matrices from the main x2c_hamiltonian function.
+     * Assumes matrices are contiguous in memory. Both UL and US
+     * are transformed out of the K basis and into the orthonormal
+     * AO basis,assuming orthogonalized matrices were input into
+     * x2c_hamiltonian(). UL, US, and R are overwritten. 
+     *
+     * @param[in]   nb        Number of spatial basis functions
+     * @param[in]   UL        Large component picture change matrix (2*nb x 2*nb)
+     * @param[in]   US        Small component picture change matrix (2*nb x 2*nb)
+     * @param[in]   K         Kinetic basis transform (nb x nb)
+     * @param[in]   X         Large to small component transfrom matrix (2*nb x 2*nb)
+     * @param[in]   R         X2C renormalization matrix (2*nb x 2*nb)
+     * @param[in]   p         Momentum basis eigenvalues (nb)
+     * @param[in]   SCR       Complex scratch space (2*nb x 2*nb)
+     *
+     **/
+    void form_picture_change(const int64_t nb, std::complex<double>* UL, 
+            std::complex<double>* US, double* K, std::complex<double>* X, 
+            std::complex<double>* R, double* p, std::complex<double>* SCR) 
+    {
+
+      // Form UL = K * R * K^-1
+      detail::blockTransform(nb, nb, R, 2*nb, K, nb, SCR, nb, UL, 2*nb, false);
+      x2chem_dbgout("UL", 2*nb, UL);
+
+      // Form US = K * 2cp^-1 * X * R * K^-1
+      // (Overwrites R)
+
+      // X*R -> SCR
+      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
+                 2*nb, 2*nb, 2*nb, 1.0, X, 2*nb, R, 2*nb, 0.0, SCR, 2*nb);
+
+      // Copy X*R back into R
+      std::copy_n(SCR, 4*nb*nb, R);
+
+      x2chem_dbgout("X*R", 2*nb, R);
+
+      // R = 2 * c * p^-1 * R  
+      for(auto i = 0; i < 2*nb; i++)
+      for(auto j = 0; j < nb; j++) {
+        R[j + 2*nb*i] = 2*LIGHTSPEED * (1./p[j]) * R[j + 2*nb*i];
+        R[j + nb + 2*nb*i] = 2*LIGHTSPEED * (1./p[j]) * R[j + nb + 2*nb*i];
+      }
+
+      // Transform K * R * K^-1
+      // where R = 2 * c * p^-1 * R * X
+      detail::blockTransform(nb, nb, R, 2*nb, K, nb, SCR, nb, US, 2*nb, false);
+      x2chem_dbgout("US", 2*nb, US);
+
+    }
+
   } // namespace detail
-
-
-  void _build_4c_core_ham(const int64_t nb, double* V, double* p, 
-                          std::complex<double>* W, std::complex<double>* core4c)
-  {
-
-    // Zero out 4C Core Ham memory
-    std::fill_n(core4c,8*nb*nb,std::complex<double>(0.));
-    for( auto i = 0; i < 2*nb; i++ )
-      std::fill_n(core4c + 8*nb*nb + 4*nb*i, 2*nb, 0.);
-
-    // Set proper matrices to subblocks of 4C Hamiltonian
-    
-    // Transformed 1C potential V 
-    detail::set_submat(nb, nb, V, nb, core4c, 4*nb);
-    detail::set_submat(nb, nb, V, nb, core4c + nb + (4*nb * nb) , 4*nb);
-    
-    // Off-diagonal c*p terms
-    std::complex<double>* CP11 = core4c + 8*nb*nb;
-    std::complex<double>* CP12 = CP11   + 4*nb*nb + nb;
-    std::complex<double>* CP21 = core4c + 2*nb;
-    std::complex<double>* CP22 = CP21   + 4*nb*nb + nb;
-
-    for (auto i = 0; i < nb; i++) {
-      CP11[i + 4*nb*i] = LIGHTSPEED * p[i];
-      CP12[i + 4*nb*i] = LIGHTSPEED * p[i];
-      CP21[i + 4*nb*i] = LIGHTSPEED * p[i];
-      CP22[i + 4*nb*i] = LIGHTSPEED * p[i];
-    }
-
-    // Spin orbit matrix W
-    detail::set_submat(2*nb, 2*nb, W, 2*nb, core4c + 2*nb + (4*nb * 2*nb) , 4*nb);
-  }
-
-
-  /**
-   * @brief Builds the 1e spin-orbit coupling (SOC) matrix from 
-   *        real 1C pVp integrals, corresponding to the bottom right 
-   *        block of the 4C Hamiltonian. 
-   *
-   * Modifies the W pointer, and assumes W is 2*nb x 2*nb 
-   * in dimension and is contiguous in memory. The W matrix
-   * is formed by 4 different nb x nb blocks. 
-   *
-   *      [ pV.p + i (pVxp)(Z)        |  (pVxp)(Y) + i (pVxp)(X) ]
-   *  W = [ ------------------------  |  ----------------------- ]
-   *      [ -(pVxp)(Y) + i (pVxp)(X)  |  pV.p - i (pVxp)(Z)      ]
-   *
-   *
-   * @param[in]   nb        Number of spatial basis functions
-   * @param[in]   W         Pointer to the W 1e SOC Matrix
-   * @param[in]   pVp       Array of 4 pointers to each real pVp 
-   *                        matrix input by the user, ordered 
-   *                        pV.p, pVxp(X), pVxp(Y), pVxp(Z)
-   * @param[in]   soc       Boolean where true computes the full
-   *                        1e SOC matrix, false only computes the 
-   *                        on diagonal blocks for scalar relativity
-   *                        without SOC.
-   *
-   **/
-  void _form_1e_soc_matrix(const int64_t nb, std::complex<double>* W, int64_t LDW,
-                           std::array<double*,4> pVp, bool soc)
-  {
-    if( soc ) {
-
-      // W = [ W1  W2 ]
-      //     [ W3  W4 ]
-      std::complex<double> *W1 = W;
-      std::complex<double> *W2 = W1 + nb*LDW;
-      std::complex<double> *W3 = W1 + nb;
-      std::complex<double> *W4 = W2 + nb;
-
-      for(auto i = 0; i < nb; i++) {
-        for(auto j = 0; j < nb; j++) {
-
-          // W1 = pV.p + i (pVxp)(Z)
-          W1[j + i*LDW] =  pVp[0][j + i*nb] + std::complex<double>(0.,1.) * pVp[3][j + i*nb];
-
-          // W2 = (pVxp)(Y) + i (pVxp)(X)
-          W2[j + i*LDW] =  pVp[2][j + i*nb] + std::complex<double>(0.,1.) * pVp[1][j + i*nb];
-
-          // W3 = -(pVxp)(Y) + i (pVxp)(X)
-          W3[j + i*LDW] = -pVp[2][j + i*nb] + std::complex<double>(0.,1.) * pVp[1][j + i*nb];
-
-          // W4 = pV.p - i (pVxp)(Z)
-          W4[j + i*LDW] =  pVp[0][j + i*nb] - std::complex<double>(0.,1.) * pVp[3][j + i*nb];
-        }
-      }
-
-    } else {
-      // FIXME: Scalar X2C calcs should be completely real 
-      // W = [ W1  0  ]
-      //     [ 0   W4 ]
-      std::complex<double> *W1 = W;
-      std::complex<double> *W2 = W1 + nb*LDW;
-      std::complex<double> *W3 = W1 + nb;
-      std::complex<double> *W4 = W2 + nb;
-
-      for(auto i = 0; i < nb; i++) {
-        for(auto j = 0; j < nb; j++) {
-
-          // W1 = pV.p 
-          W1[j + i*LDW] = pVp[0][j + i*nb];
-
-          // W4 = pV.p
-          W4[j + i*LDW] = pVp[0][j + i*nb];
-
-          // Zero out W2 and W3 blocks
-          W2[j + i*LDW] = 0.0;
-          W3[j + i*LDW] = 0.0;
-        }
-      }
-    
-    }
-
-  } 
 
 
   void x2c_hamiltonian(const int64_t nb, const Integrals& ints,
@@ -292,13 +349,11 @@ namespace X2Chem {
     // T = 1C kinetic
     std::copy_n(T, nbsq, K);
     auto status = lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, nb, K, nb, eig);
-    std::cout << "STATUS: " << status << std::endl;
 
     x2chem_dbgout("K Matrix", nb, K);
 
     // p^-1 = 1 / sqrt(2 * t) 
     for (auto i = 0; i < nb; i++) {
-      std::cout << "eig[" << i << "] = " << eig[i] << std::endl;
       p[i] = 1. / std::sqrt( 2. * eig[i] );
     }
 
@@ -328,7 +383,6 @@ namespace X2Chem {
     // where p^-1 is a diagonal matrix
     for(auto mat = 0; mat < 4; mat++) {
       for (auto i = 0; i < nb; i++) {
-        std::cout << "p[" << i << "] = " << p[i] << std::endl;
         for (auto j = 0; j < nb; j++) {
           pVp_t[mat][j + i*nb] *= p[i] * p[j];
         }
@@ -342,7 +396,7 @@ namespace X2Chem {
 
     // Form full spin-orbit coupling matrix W
     int64_t LDW = 2*nb;
-    _form_1e_soc_matrix(nb, W, LDW, pVp_t, true);
+    detail::form_1e_soc_matrix(nb, W, LDW, pVp_t, true);
     x2chem_dbgout("W Matrix", 2*nb, W);    // Subtract out 2mc^2 from W diagonals
     const double Wscale = 2. * LIGHTSPEED * LIGHTSPEED;
     for(auto i = 0; i < 2*nb; i++) W[i + i*LDW] -= Wscale;
@@ -351,7 +405,7 @@ namespace X2Chem {
     for(auto i = 0; i < nb; i++) p[i] = 1./p[i];
 
     // Build 4C Core Hamiltonian
-    _build_4c_core_ham(nb, V_tilde, p, W, core4c);
+    detail::build_4c_core_ham(nb, V_tilde, p, W, core4c);
     x2chem_dbgout("4C Core", 4*nb, core4c);
 
     // Diagonalize 4C Core Hamiltonian
@@ -390,9 +444,6 @@ namespace X2Chem {
 
     // Diagonalize R: R -> V * r * V^+
     lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 2*nb, R, 2*nb, eig);
-
-    for(auto i = 0; i < 2*nb; i++)
-      std::cout << "R EIG" << i << ": " << eig[i] << std::endl;
 
     // CSCR -> V * r^-0.25
     for(auto i = 0; i < 2*nb; i++)
@@ -467,65 +518,10 @@ namespace X2Chem {
     // Form U_X2C for picture change
     //
 
-    _form_picture_change(nb, output.UL, output.US, K, X, R, p, SCR1); 
+    detail::form_picture_change(nb, output.UL, output.US, K, X, R, p, SCR1); 
 
   }
   
-  /**
-   * @brief Form picture change matrices UL and US for 
-   *        X2C property evaluation
-   *
-   * Forms both the picture change matrices UL and US requiring
-   * intermediate matrices from the main x2c_hamiltonian function.
-   * Assumes matrices are contiguous in memory. Both UL and US
-   * are transformed out of the K basis and into the orthonormal
-   * AO basis,assuming orthogonalized matrices were input into
-   * x2c_hamiltonian(). UL, US, and R are overwritten. 
-   *
-   * @param[in]   nb        Number of spatial basis functions
-   * @param[in]   UL        Large component picture change matrix (2*nb x 2*nb)
-   * @param[in]   US        Small component picture change matrix (2*nb x 2*nb)
-   * @param[in]   K         Kinetic basis transform (nb x nb)
-   * @param[in]   X         Large to small component transfrom matrix (2*nb x 2*nb)
-   * @param[in]   R         X2C renormalization matrix (2*nb x 2*nb)
-   * @param[in]   p         Momentum basis eigenvalues (nb)
-   * @param[in]   SCR       Complex scratch space (2*nb x 2*nb)
-   *
-   **/
-  void _form_picture_change(const int64_t nb, std::complex<double>* UL, 
-          std::complex<double>* US, double* K, std::complex<double>* X, 
-          std::complex<double>* R, double* p, std::complex<double>* SCR) 
-  {
-
-    // Form UL = K * R * K^-1
-    detail::blockTransform(nb, nb, R, 2*nb, K, nb, SCR, nb, UL, 2*nb, false);
-    x2chem_dbgout("UL", 2*nb, UL);
-
-    // Form US = K * 2cp^-1 * X * R * K^-1
-    // (Overwrites R)
-
-    // X*R -> SCR
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
-               2*nb, 2*nb, 2*nb, 1.0, X, 2*nb, R, 2*nb, 0.0, SCR, 2*nb);
-
-    // Copy X*R back into R
-    std::copy_n(SCR, 4*nb*nb, R);
-
-    x2chem_dbgout("X*R", 2*nb, R);
-
-    // R = 2 * c * p^-1 * R  
-    for(auto i = 0; i < 2*nb; i++)
-    for(auto j = 0; j < nb; j++) {
-      R[j + 2*nb*i] = 2*LIGHTSPEED * (1./p[j]) * R[j + 2*nb*i];
-      R[j + nb + 2*nb*i] = 2*LIGHTSPEED * (1./p[j]) * R[j + nb + 2*nb*i];
-    }
-
-    // Transform K * R * K^-1
-    // where R = 2 * c * p^-1 * R * X
-    detail::blockTransform(nb, nb, R, 2*nb, K, nb, SCR, nb, US, 2*nb, false);
-    x2chem_dbgout("US", 2*nb, US);
-
-  }
 
   /**
    * @brief Scales the X2C core Hamiltonian using
@@ -603,9 +599,6 @@ namespace X2Chem {
                                  N, N, basisMat, N, scratch, nullptr, N, nullptr, N);
     if( code != 0 )
       throw LinAlgExcept("GESVD", code);
-
-    for( auto i = 0; i < N; i++)
-      std::cout << "ortho eig " << i << ": " << scratch[i] << std::endl;
 
     // Find number of singular values above tolerance
     int64_t nSigVec = std::distance(
@@ -685,11 +678,6 @@ namespace X2Chem {
     // U^-1\dag = SU
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
                nb, nbu, nb, 1.0, ints.S, nb, S, nb, 0.0, T, nb);
-    std::cout << "Transform" << std::endl;
-    detail::print_matrix(nb, T);
-
-    std::cout << "Ortho CoreH" << std::endl;
-    detail::print_matrix(2*nbu, output.coreH);
 
 
     // Transform the core into the nonorthogonal basis

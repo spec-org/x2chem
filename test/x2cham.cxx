@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 #include <lapack.hh>
 #include <x2chem.hpp>
+#include <x2chem/detail.hpp>
 
 
 void setup_ints(std::vector<double>& S, std::vector<double>& T,

@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 #include <lapack.hh>
 #include <x2chem.hpp>
+#include <x2chem/detail.hpp>
 
 
 using namespace X2Chem;
@@ -146,7 +147,7 @@ TEST( Picture_Change, UH_91Plus ) {
   //
 
   // Run picture change routine
-  _form_picture_change(nb, UL, US, K, X, R, p, CSCR1);
+  detail::form_picture_change(nb, UL, US, K, X, R, p, CSCR1);
 
   // Back transform UL to AO basis
   detail::transform(nb, nb, UL, 2*nb, ortho, nb, CSCR2, nb, CSCR1, 2*nb, false);

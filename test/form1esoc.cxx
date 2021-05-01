@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <x2chem.hpp>
+#include <x2chem/detail.hpp>
 
 using namespace X2Chem;
 
@@ -60,7 +61,7 @@ TEST( Form1eSOC, dense_W ) {
 
   // Form test W
   int64_t LDW = 2*nb;
-  _form_1e_soc_matrix(nb, computed_W, LDW, pVp, true);
+  detail::form_1e_soc_matrix(nb, computed_W, LDW, pVp, true);
 
   // Compare SOC matrices
   for( auto i = 0; i < 2*nb; i++ ) {
@@ -136,7 +137,7 @@ TEST( Form1eSOC, dense_W_noSOC ) {
 
   // Form test W
   int64_t LDW = 2*nb;
-  _form_1e_soc_matrix(nb, computed_W, LDW, pVp, false);
+  detail::form_1e_soc_matrix(nb, computed_W, LDW, pVp, false);
 
   // Compare SOC matrices
   for( auto i = 0; i < 2*nb; i++ ) {

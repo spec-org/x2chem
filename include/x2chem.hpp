@@ -2,11 +2,14 @@
 
 #include <array>
 #include <complex>
-#include <iomanip>
 #include <stdexcept>
 #include <string>
 
 namespace X2Chem {
+
+  //
+  // Input and output structures
+  //
 
   // Physical constants
   constexpr double LIGHTSPEED = 137.035999074; // Atomic units
@@ -48,7 +51,8 @@ namespace X2Chem {
     const char* what() const noexcept { return message.c_str(); }
 
   };
-  
+
+
   //
   // Main API calls
   //
@@ -69,71 +73,10 @@ namespace X2Chem {
   // Boettger 2e SOC scaling factor
   void boettger_2e_soc(int64_t, std::complex<double>*, double*, int64_t*);
 
+  // Orthonormalize matrix and give transformation
+  // Only implemented for double and std::complex<double>
   template <typename T>
   int64_t orthonormalize(int64_t, T*, double*, double);
 
-
-  //
-  // Internal subroutines
-  //
-
-  // Construct 4C Core Hamiltonian
-  void _build_4c_core_ham(const int64_t, double*, double*, std::complex<double>*, std::complex<double>*); 
-
-  // Form spin-orbit coupling matrix (W) 
-  void _form_1e_soc_matrix(const int64_t, std::complex<double>*, int64_t, std::array<double*,4>, bool);
-
-  // Form picture change unitary matrices UL and US
-  void _form_picture_change(const int64_t, std::complex<double>*, std::complex<double>*,
-               double*, std::complex<double>*, std::complex<double>*, 
-               double*, std::complex<double>*);
-
-
-  //
-  // Auxilary functions
-  //
-
-  namespace detail {
-
-    // Inverse of a matrix using LU factorization (getrf + getri)
-    void LUinv_square(const int64_t, std::complex<double>*, int64_t, int64_t*);
-
-    template <typename OpT, typename TransT>
-    void transform(int64_t n, int64_t m, OpT* A, int64_t LDA, TransT* U,
-      int64_t LDU, OpT* SCR, int64_t LDS, OpT* B, int64_t LDB, bool forward);
-
-    template <typename OpT, typename TransT>
-    void blockTransform(int64_t n, int64_t m, OpT* A, int64_t LDA, TransT* U,
-      int64_t LDU, OpT* SCR, int64_t LDS, OpT* B, int64_t LDB, bool forward);
-
-    // Set submats of larger matrix
-    template <typename sourceT, typename destT>
-    void set_submat(const int64_t n, const int64_t m, const sourceT* A,
-      const int64_t LDA, destT* B, const int64_t LDB)
-    {
-      for (auto i = 0; i < m; i++)
-      for (auto j = 0; j < n; j++) {
-          B[i*LDB + j] = destT(A[i*LDA + j]);
-      }
-    }
-
-    // Dev functions
-    template <typename T>
-    void print_matrix(const int64_t N, const T* matrix)
-    {
-
-      std::cout << std::scientific << std::setprecision(8);
-      // Print matrix column major
-      for (auto i = 0; i < N; i++) {
-        std::cout << "Row " << i << ":  ";
-        for (auto j = 0; j < N; j++) {
-          std::cout << std::setw(11) << matrix[j*N + i] << " ";
-        }
-        std::cout << std::endl;
-      }
-
-    }
-
-  }
-
+  
 }

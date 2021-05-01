@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 #include <blas.hh>
 #include <x2chem.hpp>
+#include <x2chem/detail.hpp>
 
 
 using namespace X2Chem;
