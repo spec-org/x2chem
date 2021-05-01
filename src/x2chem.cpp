@@ -83,7 +83,8 @@ namespace X2Chem {
 
     /**
      * @brief Transforms a 2n x 2n matrix according to a logically block
-     *        diagonal matrix
+     *        diagonal matrix. Input and output matrices _cannot_ be the same
+     *        unless the strides match.
      **/
     template <typename OpT, typename TransT>
     void blockTransform(int64_t n, int64_t m, OpT* A, int64_t LDA, TransT* U,
@@ -290,12 +291,16 @@ namespace X2Chem {
     // Eigenproblem TK = Kt to solve for transformation matrix K
     // T = 1C kinetic
     std::copy_n(T, nbsq, K);
-    lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, nb, K, nb, eig);
+    auto status = lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, nb, K, nb, eig);
+    std::cout << "STATUS: " << status << std::endl;
 
     x2chem_dbgout("K Matrix", nb, K);
 
     // p^-1 = 1 / sqrt(2 * t) 
-    for (auto i = 0; i < nb; i++) p[i] = 1. / std::sqrt( 2. * eig[i] );
+    for (auto i = 0; i < nb; i++) {
+      std::cout << "eig[" << i << "] = " << eig[i] << std::endl;
+      p[i] = 1. / std::sqrt( 2. * eig[i] );
+    }
 
 
     // Transform non-rel potential V -> V_tilde
@@ -305,6 +310,8 @@ namespace X2Chem {
 
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
                nb, nb, nb, 1.0, DSCRW, nb, K, nb, 0.0, V_tilde, nb);
+
+    x2chem_dbgout("V_t Matrix", nb, V_tilde);
 
     // Transform pV.p and pVxp integrals
     // K^+ w K
@@ -321,10 +328,12 @@ namespace X2Chem {
     // where p^-1 is a diagonal matrix
     for(auto mat = 0; mat < 4; mat++) {
       for (auto i = 0; i < nb; i++) {
+        std::cout << "p[" << i << "] = " << p[i] << std::endl;
         for (auto j = 0; j < nb; j++) {
           pVp_t[mat][j + i*nb] *= p[i] * p[j];
         }
       }
+      x2chem_dbgout("pVp_t Matrix", nb, pVp_t[mat]);
     }
 
     //
@@ -381,6 +390,9 @@ namespace X2Chem {
 
     // Diagonalize R: R -> V * r * V^+
     lapack::heev(lapack::Job::Vec, lapack::Uplo::Lower, 2*nb, R, 2*nb, eig);
+
+    for(auto i = 0; i < 2*nb; i++)
+      std::cout << "R EIG" << i << ": " << eig[i] << std::endl;
 
     // CSCR -> V * r^-0.25
     for(auto i = 0; i < 2*nb; i++)
@@ -592,6 +604,9 @@ namespace X2Chem {
     if( code != 0 )
       throw LinAlgExcept("GESVD", code);
 
+    for( auto i = 0; i < N; i++)
+      std::cout << "ortho eig " << i << ": " << scratch[i] << std::endl;
+
     // Find number of singular values above tolerance
     int64_t nSigVec = std::distance(
         scratch,
@@ -655,7 +670,7 @@ namespace X2Chem {
 
     // Orthogonalize
     // TODO: configurable cutoff for orthogonalization or a better choice
-    auto nbu = orthonormalize(nb, S, DSCR, 1e-12);
+    auto nbu = orthonormalize(nb, S, DSCR, 1e-13);
     for(auto i = 1; i < 7; i++) {
       double* mat = S + i*nbsq;
       detail::transform(nb, nbu, mat, nb, S, nb, DSCR, nb, mat, nbu, true);
@@ -670,10 +685,21 @@ namespace X2Chem {
     // U^-1\dag = SU
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, 
                nb, nbu, nb, 1.0, ints.S, nb, S, nb, 0.0, T, nb);
+    std::cout << "Transform" << std::endl;
+    detail::print_matrix(nb, T);
+
+    std::cout << "Ortho CoreH" << std::endl;
+    detail::print_matrix(2*nbu, output.coreH);
+
 
     // Transform the core into the nonorthogonal basis
+    std::complex<double>* extraMat = CSCR + nbsq;
     detail::blockTransform(nbu, nb, output.coreH, 2*nbu, T, nb, CSCR, nb,
-                           output.coreH, 2*nb, false);
+                           extraMat, 2*nb, false);
+    std::copy_n(extraMat, 4*nbsq, output.coreH);
+
+    
+
 
     // Transform the picture change matrices into the "non-orthogonal basis"
     // Since these are actually transformation matrices themselves, we need to
@@ -683,10 +709,8 @@ namespace X2Chem {
     //   inverse transform above but this is a little cleaner. Can be easily
     //   optimized if necessary.
 
-    std::complex<double>* extraMat = CSCR + nbsq;
-
     // U ML U\dag
-    detail::blockTransform(nbu, nb, output.UL, 2*nbu, S, nb, CSCR, nb,
+    detail::blockTransform(nbu, nb, output.UL, 2*nbu, S, nb, CSCR, nbu,
                            extraMat, 2*nb, false);
     x2chem_dbgout("V.UL.VT", 2*nb, extraMat);
     // U ML U\dag S
@@ -706,7 +730,7 @@ namespace X2Chem {
 
 
     // U MS U\dag
-    detail::blockTransform(nbu, nb, output.US, 2*nbu, S, nb, CSCR, nb,
+    detail::blockTransform(nbu, nb, output.US, 2*nbu, S, nb, CSCR, nbu,
                            extraMat, 2*nb, false);
     x2chem_dbgout("V.US.VT", 2*nb, extraMat);
     // U MS U\dag S
